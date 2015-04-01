@@ -1,0 +1,27 @@
+[submodule "deps/ninja"]
+	path = deps/ninja
+	url = https://github.com/martine/ninja.git
+[submodule "deps/gyp"]
+	path = deps/gyp
+	url = https://chromium.googlesource.com/external/gyp.git
+[submodule "deps/llvm"]
+	path = deps/llvm
+	url = https://chromium.googlesource.com/chromiumos/third_party/llvm.git
+[submodule "deps/compiler-rt"]
+	path = deps/compiler-rt
+	url = https://chromium.googlesource.com/chromiumos/third_party/compiler-rt.git
+[submodule "deps/clang"]
+	path = deps/clang
+	url = https://chromium.googlesource.com/chromiumos/third_party/clang.git
+[submodule "deps/libcxxabi"]
+	path = deps/libcxxabi
+	url = https://chromium.googlesource.com/chromium/llvm-project/libcxxabi.git
+[submodule "deps/newlib-cygwin"]
+	path = deps/newlib-cygwin
+	url = git://sourceware.org/git/newlib-cygwin.git
+[submodule "deps/libcxx"]
+	path = deps/libcxx
+	url = https://chromium.googlesource.com/chromium/llvm-project/libcxx.git
+[submodule "deps/googletest"]
+	path = deps/googletest
+	url = https://chromium.googlesource.com/external/googletest

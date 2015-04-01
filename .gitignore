@@ -1,0 +1,11 @@
+# Editors.
+*.sw*
+.DS_Store
+
+# Build tools.
+build/ninja
+build/llvm
+build/llvm-build/
+
+# Build products.
+out/
