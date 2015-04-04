@@ -1,30 +1,19 @@
-#include <cstdint>  // Standard size_t and uintptr_t
-
-#include "phys_ptr.h"
+#include "bare/phys_ptr.h"
 
 #include "gtest/gtest.h"
 
+using sanctum::bare::phys_ptr;
+using sanctum::bare::phys_ref;
+using sanctum::bare::size_t;
+using sanctum::bare::uintptr_t;
+using sanctum::testing::phys_buffer;
+using sanctum::testing::phys_buffer_size;
 
-char phys_buffer[8192];
-
-template<> inline phys_ref<size_t>::operator size_t() const {
-  return *(reinterpret_cast<size_t *>(&phys_buffer[addr]));
-}
-template<> inline phys_ref<size_t>& phys_ref<size_t>::
-    operator =(const size_t& value) {
-  *(reinterpret_cast<size_t *>(&phys_buffer[addr])) = value;
-  return *this;
-}
-
-//template<> inline uintptr_t phys_ptr<uintptr_t>::operator *() const {
-//  return addr + 42;
-//}
-
-TEST(PhysPtrTest, HandlesUintptrT) {
+TEST(PhysPtrTest, HandlesUintptr) {
   uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
   uintptr_t value = 0xbeef, write_value = 0xdeed;
   uintptr_t zero = 0;
-  memset(phys_buffer, 0, sizeof(phys_buffer));
+  memset(phys_buffer, 0, phys_buffer_size);
   *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)) = value;
 
   phys_ptr<uintptr_t> ptr_addr{addr};
@@ -67,13 +56,21 @@ TEST(PhysPtrTest, HandlesUintptrT) {
   phys_ptr<uintptr_t> ptr_sum = ptr_addr;
   ptr_sum += 16;
   ASSERT_EQ(&ptr_addr[16], ptr_sum);
+
+  *ptr_addr += write_value;
+  ASSERT_EQ(value + write_value,
+            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+  ASSERT_EQ(value + write_value, *ptr_addr);
+  *ptr_addr = value;
+
+  *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)) = 0;
 }
 
-TEST(PhysPtrTest, HandlesSizeT) {
+TEST(PhysPtrTest, HandlesSize) {
   uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
   size_t value = 0xbeef, write_value = 0xdeed;
   size_t zero = 0;
-  memset(phys_buffer, 0, sizeof(phys_buffer));
+  memset(phys_buffer, 0, phys_buffer_size);
   *(reinterpret_cast<size_t*>(phys_buffer + addr)) = value;
 
   phys_ptr<size_t> ptr_addr{addr};
@@ -116,6 +113,14 @@ TEST(PhysPtrTest, HandlesSizeT) {
   phys_ptr<size_t> ptr_sum = ptr_addr;
   ptr_sum += 16;
   ASSERT_EQ(&ptr_addr[16], ptr_sum);
+
+  *ptr_addr += write_value;
+  ASSERT_EQ(value + write_value,
+            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+  ASSERT_EQ(value + write_value, *ptr_addr);
+  *ptr_addr = value;
+
+  *(reinterpret_cast<size_t*>(phys_buffer + addr)) = 0;
 }
 
 typedef struct {
@@ -128,7 +133,7 @@ TEST(PhysPtrTest, HandlesStruct) {
   uintptr_t a_value = 0xbeef, write_a_value = 0xdeed;
   size_t b_value = 0xcafe, write_b_value = 0xface;
   uintptr_t zero = 0;
-  memset(phys_buffer, 0, sizeof(phys_buffer));
+  memset(phys_buffer, 0, phys_buffer_size);
   (reinterpret_cast<test_struct*>(phys_buffer + addr))->a = a_value;
   (reinterpret_cast<test_struct*>(phys_buffer + addr))->b = b_value;
 
@@ -196,4 +201,7 @@ TEST(PhysPtrTest, HandlesStruct) {
   phys_ptr<test_struct> ptr_sum = ptr_addr;
   ptr_sum += 16;
   ASSERT_EQ(&ptr_addr[16], ptr_sum);
+
+  (reinterpret_cast<test_struct*>(phys_buffer + addr))->a = 0;
+  (reinterpret_cast<test_struct*>(phys_buffer + addr))->b = 0;
 }

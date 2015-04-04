@@ -1,7 +1,11 @@
-#if !defined(MONITOR_PHYS_PTR_H_INCLUDED)
-#define MONITOR_PHYS_PTR_H_INCLUDED
+#if !defined(BARE_PHYS_PTR_H_INCLUDED)
+#define BARE_PHYS_PTR_H_INCLUDED
 
+#include "base_types.h"
 #include "traits.h"
+
+namespace sanctum {
+namespace bare {
 
 template<typename T, typename E = void> class phys_ptr;
 template<typename T> class phys_ptr<T,
@@ -26,16 +30,26 @@ public:
   // Guarantee the existence of a default copy assignment.
   inline phys_ref<T>& operator =(const phys_ref<T>&) noexcept = default;
   // No move assign, the copy constructor is just as cheap.
-  inline phys_ref<T>& operator =(phys_ref<T>&&) noexcept = delete;
+  phys_ref<T>& operator =(phys_ref<T>&&) noexcept = delete;
 
   // Dereference.
   operator T() const;
   // Reference assignment.
   phys_ref<T>& operator =(const T&);
   // Address-of.
-  phys_ptr<T> operator &() {
-    return phys_ptr<T>{addr};
+  inline phys_ptr<T> operator &() { return phys_ptr<T>{addr}; }
+
+  // Convenience overloads.
+  //
+  // The RISC V ISA doesn't have any opcodes that use memory directly, except
+  // for load/store, so there's no optimization opportunity in implementing
+  // operators such as += in assembly. Therefore, we implement what we need
+  // once, here.
+  inline phys_ref<T>& operator +=(const T& other) {
+    this->operator =(this->operator T() + other);
+    return *this;
   }
+
 private:
   // Initialize from a physical address.
   explicit inline phys_ref(const uintptr_t& phys_addr) noexcept
@@ -146,4 +160,10 @@ private:
   uintptr_t addr;
 };
 
-#endif  // !defined(MONITOR_PHYS_PTR_H_INCLUDED)
+};  // namespace sanctum::bare
+};  // namespace sanctum
+
+// Per-architecture implementations of physical loads and stores.
+#include "phys_ptr_arch.h"
+
+#endif  // !defined(BARE_PHYS_PTR_H_INCLUDED)

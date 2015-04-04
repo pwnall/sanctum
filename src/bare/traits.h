@@ -1,5 +1,8 @@
-#if !defined(MONITOR_TRAITS_H_INCLUDED)
-#define MONITOR_TRAITS_H_INCLUDED
+#if !defined(BARE_TRAITS_H_INCLUDED)
+#define BARE_TRAITS_H_INCLUDED
+
+namespace sanctum {
+namespace bare {
 
 // Useful subset of the type traits in the C++ 11/14 stdlib.
 
@@ -65,4 +68,7 @@ template <class T> struct is_class : public integral_constant<
     bool, is_class_or_union<T>::value && !is_union<T>::value> {
 };
 
-#endif  // !defined(MONITOR_TRAITS_H_INCLUDED)
+};  // namespace sanctum::bare
+};  // namespace sanctum
+
+#endif  // !defined(BARE_TRAITS_H_INCLUDED)

@@ -2,6 +2,15 @@
 
 #include "gtest/gtest.h"
 
+using sanctum::bare::is_same;
+using sanctum::bare::remove_const;
+using sanctum::bare::remove_volatile;
+using sanctum::bare::remove_cv;
+using sanctum::bare::is_class_or_union;
+using sanctum::bare::is_union;
+using sanctum::bare::is_class;
+
+
 typedef union {
   int a;
   int b;
