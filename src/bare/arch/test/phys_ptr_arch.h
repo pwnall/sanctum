@@ -1,8 +1,6 @@
 #if !defined(BARE_ARCH_TEST_PHYS_PTR_ARCH_H_INCLUDED)
 #define BARE_ARCH_TEST_PHYS_PTR_ARCH_H_INCLUDED
 
-#include "../../base_types.h"
-
 #include <cassert>  // Memory operations use assert for bound-checking.
 
 namespace sanctum {

@@ -1,5 +1,6 @@
-#include <cstddef>  // size_t
-#include <cstdint>  // uintptr_t
+#include "../../phys_ptr.h"
+
+using namespace sanctum::bare;
 
 namespace sanctum {
 namespace testing {

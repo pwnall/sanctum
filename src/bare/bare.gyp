@@ -40,6 +40,7 @@
       'target_name': 'bare_testing',
       'type': '<(library)',
       'sources': [
+        'arch/test/page_tables_arch.cc',
         'arch/test/phys_ptr_arch.cc',
         'arch/test/gtest_main.cc',
       ],
@@ -63,6 +64,8 @@
       'target_name': 'bare_tests',
       'type': 'executable',
       'sources': [
+        'base_types_test.cc',
+        'page_tables_test.cc',
         'phys_atomics_test.cc',
         'phys_ptr_test.cc',
         'traits_test.cc',
