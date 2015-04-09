@@ -1,3 +1,6 @@
+// NOTE: This header has leftovers from an initial sketch, and is not included
+//       anywhere. It will eventually disappear.
+
 // The physical address of the next level table in a page table entry.
 //
 // `entry_addr` must be a valid physical address, otherwise invalid memory
@@ -28,25 +31,7 @@ inline void set_wired_page_table_entry(uintptr_t entry_addr, size_t level,
   store_phys_ptr(entry_addr, dest_addr | 3);  // present, read-only
 }
 
-// Sets the EPTRR (enclave page table root register).
-//
-// This can only be issued by the security monitor. An invalid DRAM address
-// will lock up or reboot the machine.
-void set_eptr_register(uintptr_t value) {
-  // TODO: asm intrinsic
-}
-
-
-inline size_t current_core() {
-  // TODO: asm intrinsic
-  return static_cast<size_t>(0);
-}
-
-
-
 // Execution state saved by an asynchronous enclave exit.
 typedef struct {
   unsigned gprs[32];
 } enclave_exit_state_t;
-
-

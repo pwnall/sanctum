@@ -1,18 +1,13 @@
-#if !defined(BARE_ARCH_TEST_PAGE_TABLES_ARCH_H_INCLUDED)
-#define BARE_ARCH_TEST_PAGE_TABLES_ARCH_H_INCLUDED
+#if !defined(BARE_ARCH_RISCV_PAGE_TABLES_ARCH_H_INCLUDED)
+#define BARE_ARCH_RISCV_PAGE_TABLES_ARCH_H_INCLUDED
 
-#include "../../cpu_context.h"  // For current_core().
+#include <cassert>  // Memory operations use assert for bound-checking.
 
 namespace sanctum {
-namespace testing {
-
-// For testing, the page table root registers are virtualized.
-extern uintptr_t core_ptrr[], core_eptrr[];
-
-};  // namespace sanctum::testing
 
 namespace bare {
 
+// TODO: set the correct constants here
 constexpr size_t page_shift() { return 12; }
 constexpr size_t page_table_levels() { return 4; }
 inline size_t page_table_shift(size_t level) { return 9; }
@@ -29,7 +24,7 @@ inline size_t page_table_entry_size(size_t level) {
 
 
 inline void set_eptrr(uintptr_t value) {
-  testing::core_eptrr[current_core()] = value;
+  // TODO: asm intrinsic
 }
 
 // Sets the PTRR (page table root register).
@@ -37,10 +32,9 @@ inline void set_eptrr(uintptr_t value) {
 // This can only be issued by the security monitor. An invalid DRAM address
 // will lock up or reboot the machine.
 inline void set_ptrr(uintptr_t value) {
-  testing::core_ptrr[current_core()] = value;
+  // TODO: asm intrinsic
 }
 
 };  // namespace sanctum::bare
 };  // namespace sanctum
-#endif  // !definded(BARE_ARCH_TEST_PAGE_TABLES_ARCH_H_INCLUDED)
-
+#endif  // !definded(BARE_ARCH_RISCV_PAGE_TABLES_ARCH_H_INCLUDED)

@@ -2,7 +2,6 @@
 #define BARE_PAGE_TABLES_H_INCLUDED
 
 #include "base_types.h"
-#include "traits.h"
 
 namespace sanctum {
 namespace bare {
@@ -64,5 +63,4 @@ constexpr size_t bits_in_a_page() { return page_size() * 8; }
 
 };  // namespace sanctum::bare
 };  // namespace sanctum
-
 #endif  // !defined(BARE_PAGE_TABLES_H_INCLUDED)

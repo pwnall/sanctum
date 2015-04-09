@@ -14,6 +14,8 @@ using sanctum::bare::set_eptrr;
 using sanctum::bare::set_ptrr;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
+using sanctum::testing::set_current_core;
+using sanctum::testing::set_total_cores;
 
 TEST(PageTablesTest, Geometry) {
   static_assert(page_table_levels() >= 1, "no page tables");
@@ -28,16 +30,40 @@ TEST(PageTablesTest, Geometry) {
   }
 }
 
-TEST(PageTablesTest, VirtualRegisters) {
+TEST(PageTablesTest, VirtualPtrr) {
   uintptr_t value = 0xcafe;
 
+  set_total_cores(8);
+
   set_ptrr(value);
-  ASSERT_EQ(value, sanctum::testing::ptrr);
+  ASSERT_EQ(value, sanctum::testing::core_ptrr[0]);
+  ASSERT_EQ(0, sanctum::testing::core_ptrr[3]);
   set_ptrr(0);
-  ASSERT_EQ(0, sanctum::testing::ptrr);
+  ASSERT_EQ(0, sanctum::testing::core_ptrr[0]);
+  set_current_core(3);
+  set_ptrr(value);
+  ASSERT_EQ(0, sanctum::testing::core_ptrr[0]);
+  ASSERT_EQ(value, sanctum::testing::core_ptrr[3]);
+  set_ptrr(0);
+  ASSERT_EQ(0, sanctum::testing::core_ptrr[3]);
+  set_current_core(0);
+}
+
+TEST(PageTablesTest, VirtualEptrr) {
+  uintptr_t value = 0xcafe;
+
+  set_total_cores(8);
 
   set_eptrr(value);
-  ASSERT_EQ(value, sanctum::testing::eptrr);
+  ASSERT_EQ(value, sanctum::testing::core_eptrr[0]);
+  ASSERT_EQ(0, sanctum::testing::core_eptrr[3]);
   set_eptrr(0);
-  ASSERT_EQ(0, sanctum::testing::eptrr);
+  ASSERT_EQ(0, sanctum::testing::core_eptrr[0]);
+  set_current_core(3);
+  set_eptrr(value);
+  ASSERT_EQ(0, sanctum::testing::core_eptrr[0]);
+  ASSERT_EQ(value, sanctum::testing::core_eptrr[3]);
+  set_eptrr(0);
+  ASSERT_EQ(0, sanctum::testing::core_eptrr[3]);
+  set_current_core(0);
 }

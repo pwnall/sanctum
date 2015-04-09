@@ -4,13 +4,14 @@
   ],
   'targets': [
     {
-      'target_name': 'monitor',
-      'type': '<(library)',
+      'target_name': 'tests',
+      'type': 'none',
       'sources': [
         # 'monitor/sanctum-monitor.cc',
       ],
       'dependencies': [
-        'bare/bare.gyp:bare',
+        'bare/bare.gyp:bare_tests',
+        'monitor/monitor.gyp:monitor_tests',
       ],
     },
   ],
