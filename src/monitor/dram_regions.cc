@@ -1,6 +1,7 @@
 #include "dram_regions.h"
 
-#include "cpu_core.h"
+#include "cpu_core_inl.h"
+#include "dram_regions_inl.h"
 
 using sanctum::api::os::dram_region_blocked;
 using sanctum::api::os::dram_region_owned;
@@ -11,13 +12,18 @@ using sanctum::bare::uintptr_t;
 using sanctum::internal::clear_dram_region_lock;
 using sanctum::internal::current_enclave;
 using sanctum::internal::dram_region_info_t;
+using sanctum::internal::dram_region_tlb_flush;
 using sanctum::internal::dram_regions_info_t;
 using sanctum::internal::g_core_count;
-using sanctum::internal::g_core_info;
+using sanctum::internal::g_core;
 using sanctum::internal::g_dram_regions;
 using sanctum::internal::g_dram_region;
 using sanctum::internal::g_dram_region_count;
-using sanctum::internal::g_dram_region_size;
+using sanctum::internal::g_dram_region_mask;
+using sanctum::internal::g_dram_region_shift;
+using sanctum::internal::g_dram_size;
+using sanctum::internal::is_dynamic_dram_region;
+using sanctum::internal::is_valid_dram_region;
 using sanctum::internal::is_valid_enclave_id;
 using sanctum::internal::test_and_set_dram_region_lock;
 using sanctum::internal::core_info_t;
@@ -28,8 +34,8 @@ namespace internal {
 phys_ptr<dram_region_info_t> g_dram_region{0};
 phys_ptr<dram_regions_info_t> g_dram_regions{0};
 
+size_t g_dram_size;
 size_t g_dram_region_count;
-size_t g_dram_region_size;
 size_t g_dram_region_mask;
 size_t g_dram_region_shift;
 
@@ -39,23 +45,17 @@ size_t g_dram_region_shift;
 namespace sanctum {
 namespace api {
 
-size_t dram_region_count() {
-  return g_dram_region_count;
+size_t dram_size() {
+  return g_dram_size;
 }
-size_t dram_region_size() {
-  return g_dram_region_size;
+size_t dram_region_mask() {
+  return g_dram_region_mask;
 }
 api_result_t block_dram_region(size_t dram_region) {
-  // NOTE: the first DRAM region stores the security monitor and must always be
-  //       assigned to the OS
-  // NOTE: safe to do this outside lock, region count never changes
-  if (dram_region == 0 || dram_region >= g_dram_region_count) {
+  if (!is_dynamic_dram_region(dram_region))
     return monitor_invalid_value;
-  }
-
-  if (test_and_set_dram_region_lock(dram_region)) {
+  if (test_and_set_dram_region_lock(dram_region))
     return monitor_concurrent_call;
-  }
 
   api_result_t result;
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
@@ -92,16 +92,10 @@ api_result_t block_dram_region(size_t dram_region) {
 namespace enclave { // sanctum::api::enclave
 
 api_result_t dram_region_check_ownership(size_t dram_region) {
-  // NOTE: the first DRAM region stores the security monitor and must always be
-  //       assigned to the OS
-  // NOTE: safe to do this outside lock, region count never changes
-  if (dram_region == 0 || dram_region >= g_dram_region_count) {
+  if (!is_dynamic_dram_region(dram_region))
     return monitor_invalid_value;
-  }
-
-  if (test_and_set_dram_region_lock(dram_region)) {
+  if (test_and_set_dram_region_lock(dram_region))
     return monitor_concurrent_call;
-  }
 
   api_result_t result;
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
@@ -125,20 +119,18 @@ api_result_t dram_region_check_ownership(size_t dram_region) {
 namespace os {  // sanctum::api::os
 
 api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
-  // NOTE: the first DRAM region will never be freed, so we don't need to
-  //       special-case it here
-  // NOTE: safe to do this outside lock, region count never changes
-  if (dram_region >= g_dram_region_count) {
+  // NOTE: non-dynamic DRAM regions will never be freed, so we don't need to
+  //       explicitly check for them here
+  if (!is_valid_dram_region(dram_region))
     return monitor_invalid_value;
-  }
-
-  if (test_and_set_dram_region_lock(dram_region)) {
+  if (test_and_set_dram_region_lock(dram_region))
     return monitor_concurrent_call;
-  }
 
   api_result_t result;
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
   if (region->*(&dram_region_info_t::state) == dram_region_free) {
+    // NOTE: null_enclave_id is accepted here and assigns the DRAM region to
+    //       the OS
     if (is_valid_enclave_id(new_owner)) {
       region->*(&dram_region_info_t::state) = dram_region_owned;
       atomic_store(&(region->*(&dram_region_info_t::owner)), new_owner);
@@ -154,16 +146,12 @@ api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
   return result;
 }
 api_result_t free_dram_region(size_t dram_region) {
-  // NOTE: the first DRAM region will never be locked, so we don't need to
-  //       special-case it here
-  // NOTE: safe to do this outside lock, region count never changes
-  if (dram_region >= g_dram_region_count) {
+  // NOTE: non-dynamic DRAM regions will never be blocked, so we don't need to
+  //       explicitly check for them here
+  if (!is_valid_dram_region(dram_region))
     return monitor_invalid_value;
-  }
-
-  if (test_and_set_dram_region_lock(dram_region)) {
+  if (test_and_set_dram_region_lock(dram_region))
     return monitor_concurrent_call;
-  }
 
   api_result_t result;
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
@@ -177,7 +165,7 @@ api_result_t free_dram_region(size_t dram_region) {
     // execute enclave code. However, every enclave exit causes a TLB flush and
     // updates the core's clock.
     for (size_t i = 0; i < g_core_count; ++i) {
-      phys_ptr<core_info_t> core = &g_core_info[i];
+      phys_ptr<core_info_t> core = &g_core[i];
       if (atomic_load(&(core->*(&core_info_t::flushed_at))) < blocked_at) {
         can_free = false;
         break;
@@ -196,6 +184,12 @@ api_result_t free_dram_region(size_t dram_region) {
   clear_dram_region_lock(dram_region);
   return result;
 }
+
+api_result_t dram_region_flush() {
+  dram_region_tlb_flush();
+  return monitor_ok;
+}
+
 
 };  // namespace sanctum::api::os
 

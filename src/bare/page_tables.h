@@ -18,33 +18,33 @@ constexpr size_t page_shift();
 constexpr size_t page_table_levels();
 
 // The number of address bits translated by a page table level.
-inline size_t page_table_shift(size_t level);
+constexpr inline size_t page_table_shift(size_t level);
 
 // The size of a page table at a given level, in pages.
-inline size_t page_table_pages(size_t level);
+constexpr inline size_t page_table_pages(size_t level);
 
 // The number of page table entries at a given level.
-inline size_t page_table_entries(size_t level);
+constexpr inline size_t page_table_entries(size_t level);
 
 // The size of a page table at a given level, in bytes.
-inline size_t page_table_size(size_t level);
+constexpr inline size_t page_table_size(size_t level);
 
 // The size of a page table entry, at a given level, in bytes.
-inline size_t page_table_entry_size(size_t level);
+constexpr inline size_t page_table_entry_size(size_t level);
 
 
-// Sets the EPTRR (enclave page table root register).
+// Sets the EPTBR (enclave page table base register).
 //
 // This can only be issued by the security monitor. An invalid DRAM address
 // will lock up or reboot the machine.
-void set_eptrr(uintptr_t value);
+void set_eptbr(uintptr_t value);
 
 
-// Sets the PTRR (page table root register).
+// Sets the PTBR (page table base register).
 //
 // This can only be issued by the security monitor. An invalid DRAM address
 // will lock up or reboot the machine.
-void set_ptrr(uintptr_t value);
+void set_ptbr(uintptr_t value);
 
 };  // namespace sanctum::bare
 };  // namespace sanctum

@@ -7,7 +7,7 @@ namespace sanctum {
 namespace testing {
 
 // For testing, the page table root registers are virtualized.
-extern uintptr_t core_ptrr[], core_eptrr[];
+extern uintptr_t core_ptbr[], core_eptbr[];
 
 };  // namespace sanctum::testing
 
@@ -15,29 +15,28 @@ namespace bare {
 
 constexpr size_t page_shift() { return 12; }
 constexpr size_t page_table_levels() { return 4; }
-inline size_t page_table_shift(size_t level) { return 9; }
-inline size_t page_table_pages(size_t level) { return 1; }
-inline size_t page_table_entries(size_t level) {
-  return 1 << page_table_shift(level);
-}
-inline size_t page_table_size(size_t level) {
-  return page_table_pages(level) << page_shift();
-}
-inline size_t page_table_entry_size(size_t level) {
+constexpr inline size_t page_table_shift(size_t level) { return 9; }
+constexpr inline size_t page_table_entry_size(size_t level) {
   return sizeof(void *);
 }
 
+// The definitions below replicate the RISC V definitions.
 
-inline void set_eptrr(uintptr_t value) {
-  testing::core_eptrr[current_core()] = value;
+constexpr inline size_t page_table_entries(size_t level) {
+  return 1 << page_table_shift(level);
+}
+constexpr inline size_t page_table_size(size_t level) {
+  return page_table_entries(level) * page_table_entry_size(level);
+}
+constexpr inline size_t page_table_pages(size_t level) {
+  return page_table_size(level) >> page_shift();
 }
 
-// Sets the PTRR (page table root register).
-//
-// This can only be issued by the security monitor. An invalid DRAM address
-// will lock up or reboot the machine.
-inline void set_ptrr(uintptr_t value) {
-  testing::core_ptrr[current_core()] = value;
+inline void set_eptbr(uintptr_t value) {
+  testing::core_eptbr[current_core()] = value;
+}
+inline void set_ptbr(uintptr_t value) {
+  testing::core_ptbr[current_core()] = value;
 }
 
 };  // namespace sanctum::bare

@@ -2,52 +2,60 @@
 #define MONITOR_ENCLAVE_H_INCLUDED
 
 #include "bare/base_types.h"
+#include "bare/phys_atomics.h"
 #include "public/api.h"
 
 namespace sanctum {
 namespace internal {
 
+using sanctum::api::enclave::thread_info_t;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
-
-// Pointers to threads.
-typedef struct {
-  phys_ptr<thread_private_info_t> thread_info;
-
-  // Acquired when this thread is running on a core.
-  //
-  // This cannot be in thread_info_t because we use it to track the number of
-  // enclave threads, and that count must be trusted.
-  atomic_flag run_lock;
-} thread_slot_t;
+using sanctum::bare::phys_ptr;
 
 // Extended version of thred_info_t.
-typedef struct {
+struct thread_private_info_t {
   // The public thread_info_t must be at the beginning of the structure.
   thread_info_t ti;
 
   atomic_flag exit_state_used;  // Set on AEX.
-} thread_private_info_t;
+};
+
+
+// Pointers to threads.
+struct thread_slot_t {
+  phys_ptr<thread_private_info_t> thread_info;
+  atomic_flag lock;
+};
 
 // Per-enclave accounting information.
-typedef struct {
-  // The enclave lock must be the first field in the structure.
-  // The lock must be acquired before accessing mutable enclave state.
-  atomic_flag lock;
+//
+// This is synchronized by the lock of the enclave's main DRAM region.
+struct enclave_info_t {
+  // Physical address of the enclave's page table base.
+  uintptr_t eptbr;
 
-  uintptr_t enclave_ptrr;   // Physical address of the page table root.
-  enclave_state_t state;
-} enclave_info_t;
+  // Number of thread_slot_t structures following the enclave_info_t.
+  //
+  // Thread IDs are between 1 and max_threads.
+  size_t max_threads;
 
-typedef enum {
-  enclave_loading = 2,      // The OS is loading pages into the enclave.
-  enclave_initialized = 3,  // The enclave is fully set up and can run.
-} enclave_state_t;
+  // non-zero when the enclave was initialized and can execute threads.
+  // NOTE: this isn't bool because we don't want to specialize phys_ptr<bool>.
+  size_t is_initialized;
+
+  // non-zero for debug enclaves.
+  size_t is_debug;
+
+  // Number of enclave threads running on cores.
+  //
+  // This field is only incremented while the enclave lock is held. However, it
+  // is decremented without holding the enclave lock, in enclave exits.
+  atomic<size_t> running_threads;
+};
 
 };  // namespace sanctum::internal
 };  // namespace sanctum
-
-
 #endif  // !defined(MONITOR_ENCLAVE_H_INCLUDED)

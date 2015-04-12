@@ -19,7 +19,7 @@ typedef uintptr_t enclave_id_t;
 constexpr enclave_id_t null_enclave_id = 0;
 
 // A thread ID is the index of the thread's info structure pointer in an array.
-typedef uintptr_t thread_id_t;
+typedef size_t thread_id_t;
 constexpr thread_id_t null_thread_id = 0;
 
 // Error codes returned from monitor API calls.
@@ -31,20 +31,26 @@ typedef enum {
   monitor_access_denied = 4
 } api_result_t;
 
-// Number of DRAM regions recognized by security monitor.
+// The amount of DRAM installed on the system.
 //
 // This API is not secured against cache timing attacks because enclaves should
 // only call it in initialization code, and the OS already knows when an
 // enclave is getting initialized, because it issues the enclave_enter() API
 // call.
-size_t dram_region_count();
-// The size of a DRAM region. Always a power of two.
+size_t dram_size();
+
+// The bits in a physical address that determine the DRAM region.
+//
+// dram_region_shift() can be computed by right-shifting the mask by 1 until
+// the least significant bit is 1. dram_region_count() can be computed by
+// adding 1 to the shifted mask mentioned above. Therefore, no security monitor
+// calls are provided for dram_region_{count,shift}().
 //
 // This API is not secured against cache timing attacks because enclaves should
 // only call it in initialization code, and the OS already knows when an
 // enclave is getting initialized, because it issues the enclave_enter() API
 // call.
-size_t dram_region_size();
+size_t dram_region_mask();
 
 // Locks a DRAM region that was previously owned by the caller.
 //
@@ -69,6 +75,9 @@ api_result_t dram_region_check_ownership(size_t dram_region);
 // thread_info_t structure. The address must be page-aligned, and must not
 // overlap with the pages used by the monitor.
 api_result_t make_enclave_thread(thread_id_t thread_id, uintptr_t phys_addr);
+
+// Ends an enclave thread and returns control to the OS.
+void exit_enclave();
 
 // Metadata for each hardware thread in an enclave.
 typedef struct {
@@ -120,8 +129,21 @@ api_result_t dram_region_flush();
 
 // Creates an enclave using the given free DRAM region.
 //
+// `ev_base` and `ev_mask` indicate the range of enclave virtual addresses. The
+// addresses this range get translated using the enclave page tables, and must
+// point into enclave memory.
+//
+// `max_thread_count` is the maximum number of enclave threads that can be
+// allocated. This argument directs the number of 2-pointer slots created for
+// threads. For example, on a 64-bit machine, a max_thread_count of 256 will
+// allocate 4KB of data.
+//
+// `debug` is set for debug enclaves. The security monitor allows debug reads
+// and writes in debug enclaves, to facilitate testing and debugging.
+//
 // Returns an enclave ID, or null_enclave_id in case of an error.
-enclave_id_t make_enclave(size_t dram_region);
+enclave_id_t make_enclave(size_t dram_region, uintptr_t ev_base,
+    uintptr_t ev_mask, size_t max_thread_count, bool debug);
 
 // Allocates a page in the enclave's main DRAM region for page tables.
 //
@@ -144,9 +166,20 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t enclave_addr,
 // Marks the given enclave as initialized and ready to execute.
 api_result_t init_enclave(enclave_id_t enclave_id);
 
-};  // namespace sanctum::api::os
+// Starts an enclave thread.
+api_result_t run_enclave_thread(enclave_id_t enclave_id,
+    thread_id_t thread_id);
 
+// Reads/writes a page from/to a debug enclave's memory.
+//
+// If the given enclave is a debug enclave, a page from its memory is copied
+// into OS memory. `enclave_addr` must point to a page in a DRAM region c
+// by the enclave, and `os_addr` must point to a page in a DRAM region owned by
+// the OS.
+api_result_t debug_enclave_copy_page(enclave_id_t enclave_id,
+    uintptr_t enclave_addr, uintptr_t os_addr, bool read_from_enclave);
+
+};  // namespace sanctum::api::os
 };  // namespace sanctum::api
 };  // namespace sanctum
-
 #endif   // !defined(SANCTUM_PUBLIC_API_H_INCLUDED)

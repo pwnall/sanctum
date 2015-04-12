@@ -21,38 +21,31 @@ struct thread_private_info_t;
 
 // Per-core accounting information.
 //
-// This information is only modified on the core that it corresponds to, so we
-// don't need atomics or locking.
-typedef struct {
+// Most information is only modified on the core that it corresponds to, so we
+// don't need atomics or locking. The notable exception is the flushed_at
+// timestamp.
+struct core_info_t {
   enclave_id_t enclave_id;  // 0 if the core isn't executing enclave code
   thread_id_t thread_id;
 
   // The DRAM backing the thread_private_info_t is guaranteed to be pinned
   // while the thread is executing on a core.
-  phys_ptr<thread_private_info_t> thread_info;
+  phys_ptr<thread_private_info_t> thread;
 
-  // block_clock when this core's TLB was last flushed
+  // The value of block_clock when this core's TLB was last flushed.
+  // This is read on other cores,
   atomic<size_t> flushed_at;
-} core_info_t;
+};
 
 // Core costants.
 //
 // These values are computed during the boot process. Once computed, the values
 // never change.
-extern phys_ptr<core_info_t> g_core_info;
+
+extern phys_ptr<core_info_t> g_core;
 
 extern size_t g_core_count;
 
-// The enclave running on the current core.
-//
-// Returns 0 if no enclave is running on the current core. This implies that
-// the caller is the OS.
-inline enclave_id_t current_enclave() {
-  phys_ptr<core_info_t> core = &g_core_info[current_core()];
-  return core->*(&core_info_t::enclave_id);
-}
-
 };  // namespace sanctum::internal
 };  // namespace sanctum
-
 #endif  // !defined(MONITOR_CPU_CORE_H_INCLUDED)

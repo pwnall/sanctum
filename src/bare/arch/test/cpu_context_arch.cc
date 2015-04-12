@@ -10,6 +10,9 @@ namespace testing {
 size_t total_cores = 0;
 size_t current_core = 0;
 
+size_t core_tlb_flush_count[max_cores];
+size_t core_cache_flush_count[max_cores];
+
 void set_current_core(size_t core_id) {
   assert(core_id < total_cores);
   current_core = core_id;
