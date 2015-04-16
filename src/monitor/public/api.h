@@ -54,6 +54,9 @@ size_t dram_region_mask();
 
 // Locks a DRAM region that was previously owned by the caller.
 //
+// Enclaves calling this API are responsible for wiping any confidential
+// information from the relinquished DRAM region.
+//
 // This API is not secured against cache timing attacks because enclaves should
 // only call it when the OS asks them to relinquish a DRAM region, so the OS
 // already knows that the call will occur, and knows what DRAM region will be
@@ -74,10 +77,15 @@ api_result_t dram_region_check_ownership(size_t dram_region);
 // `phys_addr` is the physical address of a range of pages that will hold the
 // thread_info_t structure. The address must be page-aligned, and must not
 // overlap with the pages used by the monitor.
-api_result_t make_enclave_thread(thread_id_t thread_id, uintptr_t phys_addr);
+api_result_t create_enclave_thread(thread_id_t thread_id, uintptr_t phys_addr);
+
+// Deallocates a thread info slot.
+//
+// The thread must not be running on any core.
+api_result_t delete_enclave_thread(thread_id_t thread_id);
 
 // Ends an enclave thread and returns control to the OS.
-void exit_enclave();
+api_result_t exit_enclave();
 
 // Metadata for each hardware thread in an enclave.
 typedef struct {
@@ -113,19 +121,16 @@ enclave_id_t dram_region_owner(size_t dram_region);
 // `new_owner` is the enclave ID of the enclave that will own the DRAM region.
 // 0 means that the DRAM region will be assigned to the OS.
 //
-// Returns monitor_ok for success.
+// Before issuing this call, the OS is responsible for wiping confidential
+// information from DRAM the region, if it was previously assigned to the OS.
+// The OS is not responsible for wiping enclave-owned DRAM regions.
 api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner);
 
 // Frees a DRAM region that was previously locked.
-//
-// Returns monitor_ok for success.
 api_result_t free_dram_region(size_t dram_region);
 
 // Performs the TLB flush needed to free a locked region.
-//
-// Returns monitor_ok for success.
 api_result_t dram_region_flush();
-
 
 // Creates an enclave using the given free DRAM region.
 //
@@ -142,26 +147,38 @@ api_result_t dram_region_flush();
 // and writes in debug enclaves, to facilitate testing and debugging.
 //
 // Returns an enclave ID, or null_enclave_id in case of an error.
-enclave_id_t make_enclave(size_t dram_region, uintptr_t ev_base,
+enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
     uintptr_t ev_mask, size_t max_thread_count, bool debug);
 
 // Allocates a page in the enclave's main DRAM region for page tables.
 //
+// `phys_addr` must be higher than the last physical address passed to a
+// load_enclave_ function, must be page-aligned, and must point into a DRAM
+// region owned by the enclave.
+//
+// `virtual_addr` is the lowest virtual address mapped by the newly created
+// page table.
+//
 // `lvl` indicates the page table level (e.g., in x86, 1 for PT, 2 for PD, 3
-// for PDPT). The top level is already created by `make_enclave`.
+// for PDPT).
 //
-// `addr` is the lowest virtual address mapped by the newly created page table.
+// This API will not check if a page table entry was already created for the
+// given virtual address and level. It is assumed that the enclave creator will
+// not expect duplicate calls
+api_result_t load_enclave_page_table(enclave_id_t enclave_id,
+    uintptr_t phys_addr, uintptr_t virtual_addr, int lvl);
+
+// Allocates and initializes a page in the enclave's main DRAM region.
 //
-// Returns 0 for success.
-api_result_t load_enclave_page_table(enclave_id_t eid, uintptr_t addr,
-      int lvl);
+// `phys_addr` must be higher than the last physical address passed to a
+// load_enclave_ function, must be page-aligned, and must point into a DRAM
+// region owned by the enclave.
+api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
+    uintptr_t virtual_addr, uintptr_t os_addr, uintptr_t access_bits);
 
 // Creates a hardware thread in an enclave.
 thread_id_t load_enclave_thread(enclave_id_t enclave_id, thread_id_t thread_id,
       uintptr_t thread_info_addr);
-
-api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t enclave_addr,
-    uintptr_t os_addr, uintptr_t access_bits);
 
 // Marks the given enclave as initialized and ready to execute.
 api_result_t init_enclave(enclave_id_t enclave_id);
@@ -169,6 +186,13 @@ api_result_t init_enclave(enclave_id_t enclave_id);
 // Starts an enclave thread.
 api_result_t run_enclave_thread(enclave_id_t enclave_id,
     thread_id_t thread_id);
+
+// Frees up all DRAM regions associated with an enclave.
+//
+// This can only be called when no enclave thread is running on any core. The
+// API wipes the DRAM regions belonging to the enclave and marks them as free.
+api_result_t delete_enclave(enclave_id_t enclave_id);
+
 
 // Reads/writes a page from/to a debug enclave's memory.
 //

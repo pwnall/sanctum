@@ -32,11 +32,13 @@ struct thread_slot_t {
 
 // Per-enclave accounting information.
 //
+// This structure is stored at the beginning of an enclave's main DRAM region,
+// followed by the enclave's DRAM region bitmap and thread slots. The monitor
+// ensures that the pages holding the structure are not evicted while the
+// enclave is alive.
+//
 // This is synchronized by the lock of the enclave's main DRAM region.
 struct enclave_info_t {
-  // Physical address of the enclave's page table base.
-  uintptr_t eptbr;
-
   // Number of thread_slot_t structures following the enclave_info_t.
   //
   // Thread IDs are between 1 and max_threads.
@@ -49,12 +51,28 @@ struct enclave_info_t {
   // non-zero for debug enclaves.
   size_t is_debug;
 
+  // Physical address of the enclave's page table base during loading.
+  //
+  // This is set by the first load_enclave_page_table() call, and forced as the
+  // EPTBR value for enclave threads created by load_enclave_thread.
+  uintptr_t loading_eptbr;
+
+  // The phyiscal address of the last page loaded into the enclave by the OS.
+  uintptr_t loading_last_addr;
+
   // Number of enclave threads running on cores.
   //
   // This field is only incremented while the enclave lock is held. However, it
   // is decremented without holding the enclave lock, in enclave exits.
   atomic<size_t> running_threads;
 };
+
+// The DRAM region bitmap for the OS.
+//
+// This is synchronized by the lock of DRAM region 0, which must belong to the
+// OS. The pointer itself is allocated at boot time, so it never changes.
+extern phys_ptr<size_t> g_os_region_bitmap;
+
 
 };  // namespace sanctum::internal
 };  // namespace sanctum

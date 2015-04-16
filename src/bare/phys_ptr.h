@@ -72,6 +72,14 @@ public:
     this->operator =(this->operator T() + other);
     return *this;
   }
+  template<typename U> inline phys_ref<T>& operator |=(const U& other) {
+    this->operator =(this->operator T() | other);
+    return *this;
+  }
+  template<typename U> inline phys_ref<T>& operator &=(const U& other) {
+    this->operator =(this->operator T() & other);
+    return *this;
+  }
 
 private:
   // Initialize from a physical address.

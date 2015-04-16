@@ -1,5 +1,6 @@
 #include "enclave.h"
 
+#include "bare/memory.h"
 #include "bare/page_tables.h"
 #include "cpu_core_inl.h"
 #include "dram_regions_inl.h"
@@ -16,7 +17,9 @@ using sanctum::api::enclave_id_t;
 using sanctum::api::os::dram_region_free;
 using sanctum::api::os::dram_region_owned;
 using sanctum::api::thread_id_t;
+using sanctum::bare::bzero;
 using sanctum::bare::atomic_fetch_add;
+using sanctum::bare::is_page_aligned;
 using sanctum::bare::page_size;
 using sanctum::bare::phys_ptr;
 using sanctum::internal::clamped_dram_region_for;
@@ -33,7 +36,6 @@ using sanctum::internal::enclave_thread_slots;
 using sanctum::internal::g_dram_region;
 using sanctum::internal::g_dram_region_shift;
 using sanctum::internal::is_dram_address;
-using sanctum::internal::is_page_aligned;
 using sanctum::internal::is_valid_range;
 using sanctum::internal::is_valid_enclave_id;
 using sanctum::internal::test_and_set_dram_region_lock;
@@ -41,10 +43,18 @@ using sanctum::internal::thread_private_info_t;
 using sanctum::internal::thread_slot_t;
 
 namespace sanctum {
+namespace internal {  // sanctum::internal
+
+phys_ptr<size_t> g_os_region_bitmap{0};
+
+};  // namespace sanctum::internal
+};  // namespace sanctum
+
+namespace sanctum {
 namespace api {  // sanctum::api
 namespace os {  // sancum::api::os
 
-enclave_id_t make_enclave(size_t dram_region, uintptr_t ev_base,
+enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
     uintptr_t ev_mask, size_t max_threads) {
   if (!is_valid_range(ev_base, ev_mask))
     return null_enclave_id;  // monitor_invalid_value
@@ -82,6 +92,9 @@ enclave_id_t make_enclave(size_t dram_region, uintptr_t ev_base,
     }
 
     enclave_info->*(&enclave_info_t::is_debug) = 0;
+
+    enclave_info->*(&enclave_info_t::loading_eptbr) = 0;
+    enclave_info->*(&enclave_info_t::loading_last_addr) = 0;
     enclave_info->*(&enclave_info_t::is_initialized) = 0;
 
     // TODO: attestation
@@ -92,6 +105,35 @@ enclave_id_t make_enclave(size_t dram_region, uintptr_t ev_base,
   clear_dram_region_lock(dram_region);
   return enclave_id;
 }
+
+api_result_t load_enclave_page_table(enclave_id_t enclave_id,
+    uintptr_t phys_addr, uintptr_t virtual_addr, int lvl) {
+  size_t dram_region = clamped_dram_region_for(enclave_id);
+  if (test_and_set_dram_region_lock(dram_region))
+    return monitor_concurrent_call;
+
+  // NOTE: null_enclave_id is accepted by is_valid_enclave_id, but does not
+  //       have a useful meaning here
+  if (enclave_id == null_enclave_id || !is_valid_enclave_id(enclave_id)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
+
+  phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  if (phys_addr <= enclave_info->*(&enclave_info_t::loading_last_addr)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
+
+  // TODO: page walk
+
+  return monitor_ok;
+}
+
+api_result_t delete_enclave(enclave_id_t enclave_id) {
+  return monitor_ok;
+}
+
 
 api_result_t run_enclave_thread(enclave_id_t enclave_id,
     thread_id_t thread_id) {
@@ -139,7 +181,7 @@ api_result_t run_enclave_thread(enclave_id_t enclave_id,
   core->*(&core_info_t::enclave_id) = enclave_id;
   core->*(&core_info_t::thread_id) = thread_id;
   core->*(&core_info_t::thread) = thread;
-  set_eptbr(enclave_info->*(&enclave_info_t::eptbr));
+  set_eptbr(enclave_info->*(&enclave_info_t::loading_eptbr));
 
 
   // TODO: modify the CPU state to perform an enclave jump
@@ -222,5 +264,27 @@ api_result_t debug_enclave_copy_page(enclave_id_t enclave_id,
 }
 
 };  // namespace sanctum::api::os
+};  // namespace sanctum::api
+};  // namespace sanctum
+
+
+namespace sanctum {
+namespace api {  // sanctum::api
+namespace enclave {  // sanctum::api::enclave
+
+api_result_t create_enclave_thread(thread_id_t thread_id,
+    uintptr_t phys_addr) {
+  return monitor_ok;
+}
+
+api_result_t delete_enclave_thread(thread_id_t thread_id) {
+  return monitor_ok;
+}
+
+api_result_t exit_enclave() {
+  return monitor_ok;
+}
+
+};  // namespace sanctum::api::enclave
 };  // namespace sanctum::api
 };  // namespace sanctum

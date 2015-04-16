@@ -1,6 +1,7 @@
 #if !defined(MONITOR_DRAM_REGIONS_INL_H_INCLUDED)
 #define MONITOR_DRAM_REGIONS_INL_H_INCLUDED
 
+#include "bare/bit_masking.h"
 #include "bare/cpu_context.h"
 #include "cpu_core.h"
 #include "dram_regions.h"
@@ -9,10 +10,14 @@ namespace sanctum {
 namespace internal {
 
 using sanctum::api::enclave_id_t;
+using sanctum::api::null_enclave_id;
 using sanctum::api::os::dram_region_state_t;
 using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
+using sanctum::bare::is_valid_range;
 using sanctum::bare::phys_ptr;
+using sanctum::bare::read_bitmap_bit;
+using sanctum::bare::set_bitmap_bit;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 
@@ -65,8 +70,6 @@ inline bool is_valid_dram_region(size_t dram_region) {
 }
 // True for DRAM regions that can be freed and re-assigned.
 //
-// This can be called without holding locks, as it relies on constant state.
-//
 // The first DRAM region contains monitor code, so it can only be assigned to
 // the OS.
 inline bool is_dynamic_dram_region(size_t dram_region) {
@@ -74,6 +77,10 @@ inline bool is_dynamic_dram_region(size_t dram_region) {
 }
 
 // Verifies the validity of an enclave ID. 0 is considered a valid ID.
+//
+// This should be called while holding the DRAM region lock for the region
+// corresponding to the given ID. This is computed by
+// clamped_dram_region_for(enclave_id).
 //
 // Returns true if the given enclave ID is valid, and false otherwise. 0 is
 // used to indicate OS ownership of DRAM areas, so it is considered a valid ID.

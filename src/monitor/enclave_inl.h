@@ -1,44 +1,28 @@
 #if !defined(MONITOR_ENCLAVE_INL_H_INCLUDED)
 #define MONITOR_ENCLAVE_INL_H_INCLUDED
 
+#include "dram_regions.h"
+#include "enclave.h"
+
 namespace sanctum {
 namespace internal {
 
 using sanctum::bare::page_size;
 using sanctum::bare::page_shift;
 
-// Checks if an argument is a valid range mask.
+// Computes the physical address of an enclave's DRAM region bitmap.
 //
-// Valid range masks are written in binary as a sequence of 0s, followed by a
-// sequence of 1s. Equivalently, the size of a base/mask range must be a power
-// of two.
-constexpr inline bool is_valid_range_mask(uintptr_t mask) {
-  return (mask & (mask + 1)) == 0;
+// The DRAM region bitmap has 1 bit for every DRAM region in the system. The
+// bits corresponding to DRAM regions allocated to the enclave are set to 1.
+inline phys_ptr<size_t> enclave_region_bitmap(enclave_id_t enclave_id) {
+  phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  return phys_ptr<size_t>{uintptr_t(enclave_info + 1)};
 }
-// Checks if an address is aligned with regard to a mask.
-constexpr inline bool is_aligned_to_mask(uintptr_t address, uintptr_t mask) {
-  return (address & mask) == 0;
-}
-// Checks the validity of a base/mask range.
-//
-// Valid range masks are written in binary as a sequence of 0s, followed by a
-// sequence of 1s. Equivalently, the size of a base/mask range must be a power
-// of two.
-//
-// A valid range base has 0s in the positions where the range mask has 1s.
-// Equivalently, the range's base must be size-aligned.
-constexpr inline bool is_valid_range(uintptr_t base, uintptr_t mask) {
-  return is_aligned_to_mask(base, mask) && is_valid_range_mask(mask);
-}
-// Checks if an address is aligned to an address translation page.
-inline bool is_page_aligned(uintptr_t address) {
-  return is_aligned_to_mask(address, page_size() - 1);
-}
-
 // Computes the physical address of an enclave's thread slots.
 inline phys_ptr<thread_slot_t> enclave_thread_slots(enclave_id_t enclave_id) {
   phys_ptr<enclave_info_t> enclave_info{enclave_id};
-  return phys_ptr<thread_slot_t>{uintptr_t{enclave_info + 1}};
+  return phys_ptr<thread_slot_t>{uintptr_t(
+      enclave_region_bitmap(enclave_id) + g_dram_region_bitmap_words)};
 }
 // Computes the physical address of a specific enclave thread slot.
 inline phys_ptr<thread_slot_t> enclave_thread_slot(enclave_id_t enclave_id,
@@ -46,19 +30,44 @@ inline phys_ptr<thread_slot_t> enclave_thread_slot(enclave_id_t enclave_id,
   return enclave_thread_slots(enclave_id) + thread_id;
 }
 
+
 // The amount of memory used by the security monitor for an enclave.
 //
-// The monitor data consists of an enclave_info_t and a thread_slot_t array. It
-// is stored at the beginning of an enclave's main DRAM region, and cannot be
-// modified by the enclave.
+// The monitor data consists of an enclave_info_t, a DRAM region bitmap, and a
+// thread_slot_t array. It is stored at the beginning of an enclave's main DRAM
+// region, and cannot be modified by the enclave.
 inline size_t enclave_monitor_area_size(size_t max_threads) {
-  return static_cast<size_t>(uintptr_t{enclave_thread_slots(0) + max_threads});
+  return static_cast<size_t>(uintptr_t(enclave_thread_slots(0) + max_threads));
 }
 
 inline size_t enclave_monitor_area_pages(size_t max_threads) {
   return (enclave_monitor_area_size(max_threads) + page_size() - 1)
       >> page_shift();
 }
+
+
+// Sets a bit in a DRAM region bitmap.
+//
+// A null enclave_id causes a bit to be set in the OS' DRAM region bitmap.
+inline void set_enclave_region_bitmap_bit(enclave_id_t enclave_id,
+    size_t dram_region, bool true_for_set) {
+  if (enclave_id == null_enclave_id)
+    set_bitmap_bit(g_os_region_bitmap, dram_region, true_for_set);
+  else
+    set_bitmap_bit(enclave_region_bitmap(enclave_id), dram_region, true_for_set);
+}
+
+// Reads a bit from a DRAM region bitmap.
+//
+// A null enclave_id causes a bit to be read from the OS' DRAM region bitmap.
+inline bool read_enclave_region_bitmap_bit(enclave_id_t enclave_id,
+    size_t dram_region) {
+  if (enclave_id == null_enclave_id)
+    return read_bitmap_bit(g_os_region_bitmap, dram_region);
+  else
+    return read_bitmap_bit(enclave_region_bitmap(enclave_id), dram_region);
+}
+
 
 };  // namespace sanctum::internal
 };  // namespace sanctum

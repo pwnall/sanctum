@@ -10,9 +10,9 @@ using sanctum::testing::phys_buffer;
 using sanctum::testing::phys_buffer_size;
 
 TEST(PhysPtrTest, HandlesUintptr) {
-  uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
-  uintptr_t value = 0xbeef, write_value = 0xdeed;
-  uintptr_t zero_addr = 0;
+  constexpr uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
+  constexpr uintptr_t value = 0xbeef, write_value = 0xdeed;
+  constexpr uintptr_t zero_addr = 0;
   memset(phys_buffer, 0, phys_buffer_size);
   *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)) = value;
 
@@ -85,15 +85,29 @@ TEST(PhysPtrTest, HandlesUintptr) {
   ASSERT_EQ(value + write_value, *ptr_addr);
   *ptr_addr = value;
 
+  static_assert(value != (value | write_value), "Invalid test setup.");
+  *ptr_addr |= write_value;
+  ASSERT_EQ(value | write_value,
+            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+  ASSERT_EQ(value | write_value, *ptr_addr);
+  *ptr_addr = value;
+
+  static_assert(value != (value & write_value), "Invalid test setup.");
+  *ptr_addr &= write_value;
+  ASSERT_EQ(value & write_value,
+            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+  ASSERT_EQ(value & write_value, *ptr_addr);
+  *ptr_addr = value;
+
   ASSERT_EQ(0, uintptr_t{phys_ptr<uintptr_t*>::null()});
 
   *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)) = 0;
 }
 
 TEST(PhysPtrTest, HandlesSize) {
-  uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
-  size_t value = 0xbeef, write_value = 0xdeed;
-  uintptr_t zero_addr = 0;
+  constexpr uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
+  constexpr size_t value = 0xbeef, write_value = 0xdeed;
+  constexpr uintptr_t zero_addr = 0;
   memset(phys_buffer, 0, phys_buffer_size);
   *(reinterpret_cast<size_t*>(phys_buffer + addr)) = value;
 
@@ -166,6 +180,20 @@ TEST(PhysPtrTest, HandlesSize) {
   ASSERT_EQ(value + write_value, *ptr_addr);
   *ptr_addr = value;
 
+  static_assert(value != (value | write_value), "Invalid test setup.");
+  *ptr_addr |= write_value;
+  ASSERT_EQ(value | write_value,
+            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+  ASSERT_EQ(value | write_value, *ptr_addr);
+  *ptr_addr = value;
+
+  static_assert(value != (value & write_value), "Invalid test setup.");
+  *ptr_addr &= write_value;
+  ASSERT_EQ(value & write_value,
+            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+  ASSERT_EQ(value & write_value, *ptr_addr);
+  *ptr_addr = value;
+
   ASSERT_EQ(0, uintptr_t{phys_ptr<size_t*>::null()});
 
   *(reinterpret_cast<size_t*>(phys_buffer + addr)) = 0;
@@ -173,9 +201,9 @@ TEST(PhysPtrTest, HandlesSize) {
 
 
 TEST(PhysPtrTest, HandlesPhysPtrOfSize) {
-  uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
-  phys_ptr<size_t> value{0xbeef}, write_value{0xdeed};
-  uintptr_t zero_addr = 0;
+  constexpr uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
+  constexpr phys_ptr<size_t> value{0xbeef}, write_value{0xdeed};
+  constexpr uintptr_t zero_addr = 0;
   memset(phys_buffer, 0, phys_buffer_size);
   *(reinterpret_cast<phys_ptr<size_t>*>(phys_buffer + addr)) = value;
 

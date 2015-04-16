@@ -2,12 +2,31 @@
   'includes': [
     '../common.gypi',
   ],
+  'variables': {
+    'bare_common_sources': [
+      'base_types.h',
+      'bit_masking.h',
+      'cpu_context.h',
+      'memory.h',
+      'page_tables.h',
+      'phys_atomics.h',
+      'phys_ptr.h',
+      'traits.h',
+    ],
+  },
   'targets': [
     {
       # Used by code that runs on bare metal, e.g. bootrom and monitor.
       'target_name': 'bare',
       'type': '<(library)',
       'sources': [
+        '<@(bare_common_sources)',
+        'arch/riscv/base_types_arch.h',
+        'arch/riscv/cpu_context_arch.h',
+        'arch/riscv/memory_arch.h',
+        'arch/riscv/page_tables_arch.h',
+        'arch/riscv/phys_atomics_arch.h',
+        'arch/riscv/phys_ptr_arch.h',
       ],
       'target_defaults': {
         'cflags_cc+': [
@@ -40,9 +59,16 @@
       'target_name': 'bare_testing',
       'type': '<(library)',
       'sources': [
+        'arch/test/base_types_arch.h',
         'arch/test/cpu_context_arch.cc',
+        'arch/test/cpu_context_arch.h',
+        'arch/test/memory_arch.cc',
+        'arch/test/memory_arch.h',
         'arch/test/page_tables_arch.cc',
+        'arch/test/page_tables_arch.h',
+        'arch/test/phys_atomics_arch.h',
         'arch/test/phys_ptr_arch.cc',
+        'arch/test/phys_ptr_arch.h',
         'arch/test/gtest_main.cc',
       ],
       'include_dirs': [
@@ -66,7 +92,9 @@
       'type': 'executable',
       'sources': [
         'base_types_test.cc',
+        'bit_masking_test.cc',
         'cpu_context_test.cc',
+        'memory_test.cc',
         'page_tables_test.cc',
         'phys_atomics_test.cc',
         'phys_ptr_test.cc',

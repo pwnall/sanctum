@@ -52,7 +52,17 @@ extern size_t g_dram_region_mask;
 // The position of the least significant 1 bit in the DRAM region mask.
 extern size_t g_dram_region_shift;
 // The number of DRAM regions indexed by the mask.
+//
+// This is always 1 + g_dram_region_mask.
 extern size_t g_dram_region_count;
+
+// The size of a DRAM region bitmap, in units of sizeof(size_t).
+//
+// This is ceil(g_dram_region_count / (sizeof(size_t) * 8)).
+extern size_t g_dram_region_bitmap_words;
+
+// Sets up the DRAM region constants.
+void boot_init_dram_regions();
 
 };  // namespace sanctum::internal
 };  // namespace sanctum
