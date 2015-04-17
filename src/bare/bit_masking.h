@@ -44,7 +44,7 @@ inline void set_bitmap_bit(phys_ptr<size_t> bitmap, size_t bit, bool value) {
 
   // NOTE: relying on the compiler to optimize division to bitwise shift
   size_t offset = bit / bits_in_size_t;
-  size_t mask = 1 << (bit % bits_in_size_t);
+  size_t mask = size_t(1) << (bit % bits_in_size_t);
 
   if (value)
     *(bitmap + offset) |= mask;
@@ -57,7 +57,7 @@ inline bool read_bitmap_bit(phys_ptr<size_t> bitmap, size_t bit) {
 
   // NOTE: relying on the compiler to optimize division to bitwise shift
   size_t offset = bit / bits_in_size_t;
-  size_t mask = 1 << (bit % bits_in_size_t);
+  size_t mask = size_t(1) << (bit % bits_in_size_t);
 
   return (*(bitmap + offset) & mask) != 0;
 }

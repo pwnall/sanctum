@@ -6,6 +6,11 @@ using sanctum::bare::is_aligned_to_mask;
 using sanctum::bare::is_page_aligned;
 using sanctum::bare::is_valid_range;
 using sanctum::bare::is_valid_range_mask;
+using sanctum::bare::phys_ptr;
+using sanctum::bare::read_bitmap_bit;
+using sanctum::bare::set_bitmap_bit;
+using sanctum::testing::phys_buffer;
+using sanctum::testing::phys_buffer_size;
 
 TEST(BitMaskingTest, IsValidRangeMask) {
   ASSERT_EQ(true, is_valid_range_mask(0x00));
@@ -56,3 +61,110 @@ TEST(BitMaskingTest, IsPageAligned) {
   ASSERT_EQ(true, is_page_aligned(0x3000));
   ASSERT_EQ(false, is_page_aligned(0x2800));
 }
+
+TEST(BitMaskingTest, ReadSetBitmapBit) {
+  constexpr uintptr_t addr = 160, addr2 = 200;
+  constexpr uintptr_t zero_addr = 0;
+  memset(phys_buffer, 0, phys_buffer_size);
+  *(reinterpret_cast<size_t*>(phys_buffer + addr)) = 0xFFFF;
+
+  phys_ptr<size_t> ptr{addr};
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 0));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 1));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 2));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 3));
+
+  set_bitmap_bit(ptr, 0, false);
+  ASSERT_EQ(0xFFFE, *ptr);
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 0));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 1));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 2));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 3));
+
+  set_bitmap_bit(ptr, 3, false);
+  ASSERT_EQ(0xFFF6, *ptr);
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 0));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 1));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 2));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 3));
+
+  set_bitmap_bit(ptr, 0, true);
+  ASSERT_EQ(0xFFF7, *ptr);
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 0));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 1));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 2));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 3));
+
+  phys_ptr<size_t> ptr2{addr2};
+  set_bitmap_bit(ptr, 320, true);
+  ASSERT_EQ(1, *ptr2);
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 319));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 320));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 321));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 322));
+
+  set_bitmap_bit(ptr, 321, true);
+  ASSERT_EQ(3, *ptr2);
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 319));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 320));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 321));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 322));
+
+  set_bitmap_bit(ptr, 320, false);
+  ASSERT_EQ(2, *ptr2);
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 319));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 320));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 321));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 322));
+
+  size_t msb = 1;
+  while(true) {
+    size_t msb2 = msb << 1;
+    if (msb2 == 0)
+      break;
+    msb = msb2;
+  }
+  set_bitmap_bit(ptr, 319, true);
+  ASSERT_EQ(msb, *(ptr2 - 1));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 317));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 318));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 319));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 320));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 321));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 322));
+
+  set_bitmap_bit(ptr, 320, true);
+  ASSERT_EQ(msb, *(ptr2 - 1));
+  ASSERT_EQ(3, *ptr2);
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 317));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 318));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 319));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 320));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 321));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 322));
+
+  set_bitmap_bit(ptr, 318, true);
+  ASSERT_EQ(size_t(msb + size_t(msb >> 1)), *(ptr2 - 1));
+  ASSERT_EQ(3, *ptr2);
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 317));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 318));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 319));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 320));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 321));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 322));
+
+  set_bitmap_bit(ptr, 319, false);
+  ASSERT_EQ(size_t(msb >> 1), *(ptr2 - 1));
+  ASSERT_EQ(3, *ptr2);
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 317));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 318));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 319));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 320));
+  ASSERT_EQ(true, read_bitmap_bit(ptr, 321));
+  ASSERT_EQ(false, read_bitmap_bit(ptr, 322));
+
+  *ptr = 0;
+  *ptr2 = 0;
+  *(ptr2 - 1) = 0;
+}
+

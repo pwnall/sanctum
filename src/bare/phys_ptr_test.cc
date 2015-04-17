@@ -79,6 +79,12 @@ TEST(PhysPtrTest, HandlesUintptr) {
   ptr_sum += 16;
   ASSERT_EQ(&ptr_addr[16], ptr_sum);
 
+  ASSERT_EQ(&ptr_addr[8], ptr_sum - 8);
+
+  phys_ptr<uintptr_t> ptr_diff = ptr_sum;
+  ptr_diff -= 8;
+  ASSERT_EQ(&ptr_addr[8], ptr_diff);
+
   *ptr_addr += write_value;
   ASSERT_EQ(value + write_value,
             *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
@@ -173,6 +179,12 @@ TEST(PhysPtrTest, HandlesSize) {
   phys_ptr<size_t> ptr_sum = ptr_addr;
   ptr_sum += 16;
   ASSERT_EQ(&ptr_addr[16], ptr_sum);
+
+  ASSERT_EQ(&ptr_addr[8], ptr_sum - 8);
+
+  phys_ptr<size_t> ptr_diff = ptr_sum;
+  ptr_diff -= 8;
+  ASSERT_EQ(&ptr_addr[8], ptr_diff);
 
   *ptr_addr += write_value;
   ASSERT_EQ(value + write_value,
@@ -270,6 +282,12 @@ TEST(PhysPtrTest, HandlesPhysPtrOfSize) {
   ptr_sum += 16;
   ASSERT_EQ(&ptr_addr[16], ptr_sum);
 
+  ASSERT_EQ(&ptr_addr[8], ptr_sum - 8);
+
+  phys_ptr<phys_ptr<size_t>> ptr_diff = ptr_sum;
+  ptr_diff -= 8;
+  ASSERT_EQ(&ptr_addr[8], ptr_diff);
+
   size_t offset = 0xfade;
   *ptr_addr += offset;
   ASSERT_EQ(value + offset,
@@ -366,6 +384,12 @@ TEST(PhysPtrTest, HandlesStruct) {
   phys_ptr<test_struct> ptr_sum = ptr_addr;
   ptr_sum += 16;
   ASSERT_EQ(&ptr_addr[16], ptr_sum);
+
+  ASSERT_EQ(&ptr_addr[8], ptr_sum - 8);
+
+  phys_ptr<test_struct> ptr_diff = ptr_sum;
+  ptr_diff -= 8;
+  ASSERT_EQ(&ptr_addr[8], ptr_diff);
 
   ASSERT_EQ(0, uintptr_t{phys_ptr<test_struct*>::null()});
 

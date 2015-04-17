@@ -146,6 +146,15 @@ public:
     return phys_ptr<T, E>{reinterpret_cast<uintptr_t>(
         reinterpret_cast<T*>(addr) + offset)};
   }
+  inline phys_ptr<T, E>& operator -=(const size_t offset) noexcept {
+    addr = reinterpret_cast<uintptr_t>(reinterpret_cast<T*>(addr) - offset);
+    return *this;
+  }
+  constexpr inline phys_ptr<T, E> operator -(const size_t offset) const
+      noexcept {
+    return phys_ptr<T, E>{reinterpret_cast<uintptr_t>(
+        reinterpret_cast<T*>(addr) - offset)};
+  }
 
   // nullptr replacement.
   static constexpr phys_ptr<T> null() noexcept { return phys_ptr<T, E>{0}; }
@@ -190,6 +199,15 @@ public:
   constexpr inline phys_ptr<T> operator +(const size_t offset) const noexcept {
     return phys_ptr<T>{reinterpret_cast<uintptr_t>(
         reinterpret_cast<T*>(addr) + offset)};
+  }
+  inline phys_ptr<T>& operator -=(const size_t offset) noexcept {
+    addr = reinterpret_cast<uintptr_t>(reinterpret_cast<T*>(addr) - offset);
+    return *this;
+  }
+  constexpr inline phys_ptr<T> operator -(const size_t offset) const
+      noexcept {
+    return phys_ptr<T>{reinterpret_cast<uintptr_t>(
+        reinterpret_cast<T*>(addr) - offset)};
   }
   static constexpr phys_ptr<T> null() noexcept { return phys_ptr<T>{0}; }
 
