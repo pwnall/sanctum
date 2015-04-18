@@ -28,15 +28,25 @@ size_t read_cache_levels();
 // The implementation may use privileged instructions.
 bool is_shared_cache(size_t cache_level);
 
-// The number of physical address bits used for the cache line index.
+// The size of a cache line at a given level.
 //
 // The implementation may be very slow, so the return value should be cached.
 //
 // The implementation may use privileged instructions.
-size_t read_cache_line_bits(size_t cache_level);
+size_t read_cache_line_size(size_t cache_level);
 
-// The number of physical address bits used for the cache set index.
-size_t read_cache_set_bits(size_t cache_level);
+// The number of cache sets at a given level.
+//
+// The implementation may be very slow, so the return value should be cached.
+//
+// The implementation may use privileged instructions.
+size_t read_cache_set_count(size_t cache_level);
+
+// The maximum value of the cache index shift for the platform.
+size_t read_min_cache_index_shift();
+
+// The minimum value of the cache index shift for the platform.
+size_t read_max_cache_index_shift();
 
 // Fills a buffer in physical memory with zeros.
 //

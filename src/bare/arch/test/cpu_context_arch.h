@@ -4,7 +4,7 @@
 namespace sanctum {
 namespace testing {
 
-extern size_t total_cores;
+extern size_t core_count;
 extern size_t current_core;
 constexpr size_t max_cores = 32;
 
@@ -14,13 +14,16 @@ constexpr size_t max_cores = 32;
 // values.
 extern size_t core_tlb_flush_count[], core_cache_flush_count[];
 
+// For testing, the cache index shift register is virtualized.
+extern size_t core_cache_index_shift[];
+
 // Sets the return value of current_core().
 void set_current_core(size_t core_id);
 
-// Sets the return value of total_cores().
+// Sets the return value of read_core_count().
 //
 // This also resets the current core to 0.
-void set_total_cores(size_t new_total);
+void set_core_count(size_t new_core_count);
 
 };  // namespace sanctum::testing
 };  // namespace sanctum
@@ -28,7 +31,7 @@ void set_total_cores(size_t new_total);
 namespace sanctum {
 namespace bare {
 
-inline size_t total_cores() { return testing::total_cores; }
+inline size_t read_core_count() { return testing::core_count; }
 inline size_t current_core() { return testing::current_core; }
 
 inline void flush_tlbs() {
@@ -37,7 +40,9 @@ inline void flush_tlbs() {
 inline void flush_private_caches() {
   testing::core_cache_flush_count[current_core()] += 1;
 }
-
+inline void set_cache_index_shift(size_t cache_index_shift) {
+  testing::core_cache_index_shift[current_core()] = cache_index_shift;
+}
 
 struct enclave_exit_state_t {
   size_t rip;

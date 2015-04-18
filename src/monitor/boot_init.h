@@ -10,7 +10,22 @@ namespace internal {
 //
 // This is used to track memory allocation during boot. It remains constant
 // after the boot initialization.
-extern size_t g_monitor_top;
+extern uintptr_t g_monitor_top;
+
+// Computes the initial top of monitor memory, based on the monitor's header.
+void boot_init_monitor_top();
+
+// Sets up DRAM regions.
+//
+// This computes the constants related to DRAM regions and sets the cache shift
+// index.
+void boot_init_dram_regions();
+
+// Allocates the monitor arrays whose sizes depend on system parameters.
+//
+// This must be called after the top of monitor memory and the DRAM region
+// constants are set.
+void boot_init_dynamic_arrays();
 
 // Stops the monitor's boot process.
 //

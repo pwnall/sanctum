@@ -2,6 +2,7 @@
 
 #include "gtest/gtest.h"
 
+using sanctum::bare::address_bits_for;
 using sanctum::bare::is_aligned_to_mask;
 using sanctum::bare::is_page_aligned;
 using sanctum::bare::is_valid_range;
@@ -60,6 +61,18 @@ TEST(BitMaskingTest, IsPageAligned) {
   ASSERT_EQ(false, is_page_aligned(0x2001));
   ASSERT_EQ(true, is_page_aligned(0x3000));
   ASSERT_EQ(false, is_page_aligned(0x2800));
+}
+
+TEST(BitMaskingTest, AddressBitsFor) {
+  ASSERT_EQ(0, address_bits_for(1));
+  ASSERT_EQ(1, address_bits_for(2));
+  ASSERT_EQ(2, address_bits_for(3));
+  ASSERT_EQ(2, address_bits_for(4));
+  ASSERT_EQ(3, address_bits_for(5));
+  ASSERT_EQ(3, address_bits_for(8));
+  ASSERT_EQ(4, address_bits_for(9));
+  ASSERT_EQ(4, address_bits_for(16));
+  ASSERT_EQ(16, address_bits_for(65536));
 }
 
 TEST(BitMaskingTest, ReadSetBitmapBit) {

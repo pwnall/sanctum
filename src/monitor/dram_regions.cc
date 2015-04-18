@@ -1,6 +1,5 @@
 #include "dram_regions.h"
 
-#include "bare/memory.h"
 #include "cpu_core_inl.h"
 #include "dram_regions_inl.h"
 #include "enclave_inl.h"
@@ -9,8 +8,6 @@ using sanctum::api::null_enclave_id;
 using sanctum::api::os::dram_region_blocked;
 using sanctum::api::os::dram_region_owned;
 using sanctum::bare::atomic_flag_test_and_set;
-using sanctum::bare::read_cache_levels;
-using sanctum::bare::read_dram_size;
 using sanctum::bare::phys_ptr;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
@@ -231,25 +228,4 @@ api_result_t dram_region_flush() {
 
 };  // namespace sanctum::api::os
 };  // namespace sanctum::api
-};  // namespace sanctum
-
-namespace sanctum {
-namespace internal {
-
-void boot_init_dram_regions() {
-  constexpr size_t bits_in_size_t = sizeof(size_t) * 8;
-
-  g_dram_size = read_dram_size();
-  size_t dram_address_bits = 0;
-
-  size_t cache_levels = read_cache_levels();
-
-  g_dram_region_mask = g_dram_region_count - 1;
-
-  // NOTE: relying on the compiler to optimize division to bitwise shift
-  g_dram_region_bitmap_words =
-      (g_dram_region_count + bits_in_size_t - 1) / bits_in_size_t;
-}
-
-};  // namespace sanctum::internal
 };  // namespace sanctum

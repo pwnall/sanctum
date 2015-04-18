@@ -5,6 +5,8 @@
   'variables': {
     'monitor_sources': [
       'api_compile_check.cc',
+      'boot_init.cc',
+      'boot_init.h',
       'cpu_core.cc',
       'cpu_core.h',
       'cpu_core_inl.h',

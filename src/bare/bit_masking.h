@@ -36,6 +36,21 @@ constexpr inline bool is_page_aligned(uintptr_t address) {
   return is_aligned_to_mask(address, page_size() - 1);
 }
 
+// The number of bits needed to represent a quantity.
+//
+// This is 1 + the position of the most significant 1 bit in the number.
+inline size_t address_bits_for(size_t memory_size) {
+  // NOTE: we could constexpr this by using a recursive implementation that
+  //       relies on tail call optimization to not generate a large stack, but
+  //       ensuring taill optimization is performed is a big hassle, and it's
+  //       not worth it, given the current usage
+  size_t bits = 0;
+  for(memory_size -= 1; memory_size > 0; memory_size >>= 1)
+    bits += 1;
+  return bits;
+}
+
+
 // Sets or clears a bit in a bitmap.
 //
 // `value` is true for setting the bit, or false for clearing the bit.

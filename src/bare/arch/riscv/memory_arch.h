@@ -13,10 +13,16 @@ inline size_t read_cache_levels() {
 inline bool is_shared_cache(size_t cache_level) {
   // TODO: asm intrinsics
 }
-inline size_t read_cache_line_bits(size_t cache_level) {
+inline size_t read_cache_line_size(size_t cache_level) {
   // TODO: asm intrinsics
 }
-inline size_t read_cache_set_bits(size_t cache_level) {
+inline size_t read_cache_set_count(size_t cache_level) {
+  // TODO: asm intrinsics
+}
+inline size_t read_min_cache_index_shift() {
+  // TODO: asm intrinsics
+}
+inline size_t read_max_cache_index_shift() {
   // TODO: asm intrinsics
 }
 

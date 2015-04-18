@@ -16,7 +16,7 @@ using sanctum::bare::set_ptbr;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 using sanctum::testing::set_current_core;
-using sanctum::testing::set_total_cores;
+using sanctum::testing::set_core_count;
 
 TEST(PageTablesTest, Geometry) {
   static_assert(page_table_levels() >= 1, "no page tables");
@@ -36,7 +36,7 @@ TEST(PageTablesTest, Geometry) {
 TEST(PageTablesTest, VirtualPtbr) {
   uintptr_t value = 0xcafe;
 
-  set_total_cores(8);
+  set_core_count(8);
 
   set_ptbr(value);
   ASSERT_EQ(value, sanctum::testing::core_ptbr[0]);
@@ -55,7 +55,7 @@ TEST(PageTablesTest, VirtualPtbr) {
 TEST(PageTablesTest, VirtualEptbr) {
   uintptr_t value = 0xcafe;
 
-  set_total_cores(8);
+  set_core_count(8);
 
   set_eptbr(value);
   ASSERT_EQ(value, sanctum::testing::core_eptbr[0]);
