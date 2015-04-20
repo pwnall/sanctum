@@ -103,6 +103,12 @@ inline bool is_dram_address(uintptr_t address) {
   return address < g_dram_size;
 }
 
+// Reads the owner from a DRAM region.
+inline enclave_id_t read_dram_region_owner(size_t dram_region) {
+  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
+  return atomic_load(&(region->*(&dram_region_info_t::owner)));
+}
+
 // Flushes the core's TLBs and updates the relevant flush generation counter.
 //
 // This code is guaranteed to be lock-free, as it is used in enclave exits.

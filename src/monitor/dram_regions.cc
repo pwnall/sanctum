@@ -5,18 +5,18 @@
 #include "enclave_inl.h"
 
 using sanctum::api::null_enclave_id;
-using sanctum::api::os::dram_region_blocked;
-using sanctum::api::os::dram_region_owned;
 using sanctum::bare::atomic_flag_test_and_set;
 using sanctum::bare::phys_ptr;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
+using sanctum::internal::blocked_enclave_id;
 using sanctum::internal::clear_dram_region_lock;
 using sanctum::internal::current_enclave;
 using sanctum::internal::dram_region_for;
 using sanctum::internal::dram_region_info_t;
 using sanctum::internal::dram_region_tlb_flush;
 using sanctum::internal::dram_regions_info_t;
+using sanctum::internal::free_enclave_id;
 using sanctum::internal::g_core_count;
 using sanctum::internal::g_core;
 using sanctum::internal::g_dram_regions;
@@ -28,6 +28,7 @@ using sanctum::internal::g_dram_size;
 using sanctum::internal::is_dynamic_dram_region;
 using sanctum::internal::is_valid_dram_region;
 using sanctum::internal::is_valid_enclave_id;
+using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::set_enclave_region_bitmap_bit;
 using sanctum::internal::test_and_set_dram_region_lock;
 using sanctum::internal::core_info_t;
@@ -62,18 +63,13 @@ api_result_t block_dram_region(size_t dram_region) {
   if (test_and_set_dram_region_lock(dram_region))
     return monitor_concurrent_call;
 
-  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-  if (region->*(&dram_region_info_t::state) != dram_region_owned) {
-    clear_dram_region_lock(dram_region);
-    return monitor_invalid_state;
-  }
-
-  enclave_id_t owner = atomic_load(&(region->*(&dram_region_info_t::owner)));
+  enclave_id_t owner = read_dram_region_owner(dram_region);
   if (owner != current_enclave()) {
     clear_dram_region_lock(dram_region);
     return monitor_access_denied;
   }
 
+  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
   if (owner != null_enclave_id &&
       region->*(&dram_region_info_t::pinned_pages) != 0) {
     clear_dram_region_lock(dram_region);
@@ -92,10 +88,8 @@ api_result_t block_dram_region(size_t dram_region) {
     return monitor_concurrent_call;
   }
 
-  region->*(&dram_region_info_t::state) = dram_region_blocked;
   region->*(&dram_region_info_t::previous_owner) = owner;
-  atomic_store(&(region->*(&dram_region_info_t::owner)),
-      static_cast<enclave_id_t>(0));
+  atomic_store(&(region->*(&dram_region_info_t::owner)), blocked_enclave_id);
   size_t block_clock = atomic_fetch_add(
       &(g_dram_regions->*(&dram_regions_info_t::block_clock)),
       static_cast<enclave_id_t>(1)) + 1;
@@ -124,13 +118,11 @@ api_result_t dram_region_check_ownership(size_t dram_region) {
 
   api_result_t result;
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-  if (region->*(&dram_region_info_t::state) == dram_region_owned) {
-    enclave_id_t owner = atomic_load(&(region->*(&dram_region_info_t::owner)));
-    if (owner == current_enclave()) {
-      result = monitor_ok;
-    } else {
-      result = monitor_invalid_state;
-    }
+
+  // NOTE: we don't need to read the state, because owner has special values
+  //       for non-owned states
+  if (read_dram_region_owner(dram_region) == current_enclave()) {
+    result = monitor_ok;
   } else {
     result = monitor_invalid_state;
   }
@@ -147,6 +139,37 @@ namespace sanctum {
 namespace api {  // sanctum::api
 namespace os {  // sanctum::api::os
 
+dram_region_state_t dram_region_state(size_t dram_region) {
+  if (!is_valid_dram_region(dram_region))
+    return dram_region_invalid;
+
+  // NOTE: we don't need to acquire the DRAM region's lock, because we're using
+  //       an atomic read
+  switch (read_dram_region_owner(dram_region)) {
+  case null_enclave_id:
+    return dram_region_owned;
+  case blocked_enclave_id:
+    return dram_region_blocked;
+  case free_enclave_id:
+    return dram_region_free;
+  default:
+    return dram_region_owned;
+  }
+}
+
+enclave_id_t dram_region_owner(size_t dram_region) {
+  if (!is_valid_dram_region(dram_region))
+    return null_enclave_id;
+
+  // NOTE: we don't need to acquire the DRAM region's lock, because we're using
+  //       an atomic read
+  enclave_id_t owner = read_dram_region_owner(dram_region);
+  if (owner == blocked_enclave_id || owner == free_enclave_id)
+    return null_enclave_id;
+
+  return owner;
+}
+
 api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
   // NOTE: non-dynamic DRAM regions will never be freed, so we don't need to
   //       explicitly check for them here
@@ -155,13 +178,16 @@ api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
   if (test_and_set_dram_region_lock(dram_region))
     return monitor_concurrent_call;
 
-  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-  if (region->*(&dram_region_info_t::state) != dram_region_free) {
+  if (read_dram_region_owner(dram_region) != free_enclave_id) {
     clear_dram_region_lock(dram_region);
     return monitor_invalid_state;
   }
 
   size_t new_owner_dram_region = dram_region_for(new_owner);
+  // NOTE: We don't need to check that new_owner_dram_region is the same as
+  //       dram_region. If that's the case, we'll simply fail to acquire the
+  //       lock and return concurrent_call. This is acceptable. Ideally, we'd
+  //       return invalid_value, but that'd increase code size.
   if (test_and_set_dram_region_lock(new_owner_dram_region)) {
     clear_dram_region_lock(dram_region);
     return monitor_concurrent_call;
@@ -169,7 +195,7 @@ api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
 
   api_result_t result;
   if (is_valid_enclave_id(new_owner)) {
-    region->*(&dram_region_info_t::state) = dram_region_owned;
+    phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
     atomic_store(&(region->*(&dram_region_info_t::owner)), new_owner);
     set_enclave_region_bitmap_bit(new_owner, dram_region, true);
     result = monitor_ok;
@@ -190,8 +216,8 @@ api_result_t free_dram_region(size_t dram_region) {
     return monitor_concurrent_call;
 
   api_result_t result;
-  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-  if (region->*(&dram_region_info_t::state) == dram_region_blocked) {
+  if (read_dram_region_owner(dram_region) == blocked_enclave_id) {
+    phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
     size_t blocked_at = region->*(&dram_region_info_t::blocked_at);
 
     bool can_free = true;
@@ -208,7 +234,7 @@ api_result_t free_dram_region(size_t dram_region) {
       }
     }
     if (can_free) {
-      region->*(&dram_region_info_t::state) = dram_region_free;
+      atomic_store(&(region->*(&dram_region_info_t::owner)), free_enclave_id);
       result = monitor_ok;
     } else {
       result = monitor_invalid_state;

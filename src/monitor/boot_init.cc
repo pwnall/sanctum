@@ -104,7 +104,6 @@ void boot_init_dynamic_arrays() {
   for (size_t i = 0; i < g_dram_region_count; ++i) {
     phys_ptr<dram_region_info_t> region{g_dram_region + i};
     atomic_flag_clear(&(region->*(&dram_region_info_t::lock)));
-    region->*(&dram_region_info_t::state) = dram_region_owned;
     atomic_init(&(region->*(&dram_region_info_t::owner)), null_enclave_id);
     region->*(&dram_region_info_t::previous_owner) = null_enclave_id;
     region->*(&dram_region_info_t::monitor_pages) = 0;

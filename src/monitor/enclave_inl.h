@@ -100,6 +100,16 @@ inline bool is_enclave_virtual_address(uintptr_t virtual_addr,
       enclave_info->*(&enclave_info_t::ev_base);
 }
 
+// Checks if a physical address points to an enclave's monitor-reserved pages.
+//
+// The caller should hold the lock of the enclave's main DRAM region.
+inline bool is_enclave_monitor_address(uintptr_t addr,
+    enclave_id_t enclave_id) {
+  phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  return addr >= enclave_id &&
+      addr <= enclave_info->*(&enclave_info_t::monitor_area_top);
+}
+
 // Walks a page table, stops at the entry at a given level.
 //
 // The level is assumed to be valid (between 0 and page_table_levels() - 1).

@@ -20,6 +20,7 @@ using sanctum::api::thread_id_t;
 using sanctum::bare::bzero;
 using sanctum::bare::atomic_fetch_add;
 using sanctum::bare::is_page_aligned;
+using sanctum::bare::is_valid_page_table_entry;
 using sanctum::bare::page_size;
 using sanctum::bare::page_shift;
 using sanctum::bare::page_table_levels;
@@ -40,12 +41,15 @@ using sanctum::internal::enclave_monitor_area_pages;
 using sanctum::internal::enclave_monitor_area_size;
 using sanctum::internal::enclave_thread_slot;
 using sanctum::internal::enclave_thread_slots;
+using sanctum::internal::free_enclave_id;
 using sanctum::internal::g_dram_region;
 using sanctum::internal::g_dram_region_shift;
 using sanctum::internal::is_dram_address;
+using sanctum::internal::is_enclave_monitor_address;
 using sanctum::internal::is_enclave_virtual_address;
 using sanctum::internal::is_valid_range;
 using sanctum::internal::is_valid_enclave_id;
+using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::read_enclave_region_bitmap_bit;
 using sanctum::internal::test_and_set_dram_region_lock;
 using sanctum::internal::thread_private_info_t;
@@ -86,9 +90,8 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
     return monitor_concurrent_call;
   }
 
-  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-  if (region->*(&dram_region_info_t::state) == dram_region_free) {
-    region->*(&dram_region_info_t::state) = dram_region_owned;
+  if (read_dram_region_owner(dram_region) == free_enclave_id) {
+    phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
     atomic_store(&(region->*(&dram_region_info_t::owner)), enclave_id);
     region->*(&dram_region_info_t::monitor_pages) = monitor_area_pages;
     region->*(&dram_region_info_t::pinned_pages) = monitor_area_pages;
@@ -111,7 +114,7 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
     enclave_info->*(&enclave_info_t::monitor_area_top) = enclave_id +
       (monitor_area_pages << page_shift());
 
-    // TODO: attestation
+    // TODO: measure the operation
   } else {
     enclave_id = null_enclave_id;  // monitor_invalid_state
   }
@@ -122,8 +125,9 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
 
 api_result_t load_enclave_page_table(enclave_id_t enclave_id,
     uintptr_t phys_addr, uintptr_t virtual_addr, size_t level, size_t acl) {
-
   if (!is_dram_address(phys_addr))
+    return monitor_invalid_value;
+  if (!is_page_aligned(phys_addr))
     return monitor_invalid_value;
   // NOTE: we need to check the level to avoid an infinite loop; we don't do
   //       any unnecessary checking on measured arguments
@@ -155,10 +159,7 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
     clear_dram_region_lock(dram_region);
     return monitor_invalid_value;
   }
-
-  uintptr_t monitor_area_top =
-      enclave_info->*(&enclave_info_t::monitor_area_top);
-  if (phys_addr >= enclave_id && phys_addr <= monitor_area_top) {
+  if (is_enclave_monitor_address(phys_addr, enclave_id)) {
     clear_dram_region_lock(dram_region);
     return monitor_invalid_value;
   }
@@ -173,25 +174,118 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
     clear_dram_region_lock(dram_region);
     return monitor_invalid_value;
   }
+  // TODO: for multi-page tables, figure out a way to check that the table
+  //       doesn't span multiple DRAM regions
 
-  size_t walk_level = page_table_levels() - 1;
-  if (level == page_table_levels() - 1) {
+  // Allocating a page table at level N means walking until level N + 1, and
+  // then editing the level N + 1 table to point to our new table.
+  size_t edit_level = level + 1;
+  if (edit_level == page_table_levels()) {
     enclave_info->*(&enclave_info_t::loading_eptbr) = phys_addr;
     // NOTE: we completely ignore virtual_addr here; we don't bother checking
     //       that it's zero because the call gets measured
   } else {
     uintptr_t ptb = enclave_info->*(&enclave_info_t::loading_eptbr);
-    uintptr_t entry_addr = walk_page_table_to_entry(ptb, virtual_addr, level);
-    if (entry_addr == 0) {
+    uintptr_t entry_addr = walk_page_table_to_entry(ptb, virtual_addr,
+        edit_level);
+    if (entry_addr == 0 || is_valid_page_table_entry(entry_addr, edit_level)) {
       clear_dram_region_lock(dram_region);
       return monitor_invalid_state;
     }
-    write_page_table_entry(entry_addr, level, phys_addr, acl);
+    write_page_table_entry(entry_addr, edit_level, phys_addr, acl);
   }
 
   enclave_info->*(&enclave_info_t::loading_last_addr) +=
       page_table_size(level);
   bzero(phys_ptr<size_t>{phys_addr}, page_table_size(level));
+
+  // TODO: measure the operation
+
+  clear_dram_region_lock(dram_region);
+  return monitor_ok;
+}
+
+api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
+    uintptr_t virtual_addr, uintptr_t os_addr, uintptr_t acl) {
+  if (!is_dram_address(phys_addr) || !is_dram_address(os_addr))
+    return monitor_invalid_value;
+  if (!is_page_aligned(phys_addr) || !is_page_aligned(os_addr))
+    return monitor_invalid_value;
+
+  size_t dram_region = clamped_dram_region_for(enclave_id);
+  if (test_and_set_dram_region_lock(dram_region))
+    return monitor_concurrent_call;
+
+  // NOTE: null_enclave_id is accepted by is_valid_enclave_id, but does not
+  //       have a useful meaning here
+  if (enclave_id == null_enclave_id || !is_valid_enclave_id(enclave_id)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
+
+  phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  if (enclave_info->*(&enclave_info_t::is_initialized) != 0) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_state;
+  }
+  if (phys_addr <= enclave_info->*(&enclave_info_t::loading_last_addr)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
+  if (!is_enclave_virtual_address(virtual_addr, enclave_id)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
+  if (is_enclave_monitor_address(phys_addr, enclave_id)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
+
+  // NOTE: see load_enclave_page_table for the explanation why we don't need to
+  //       lock phys_addr's DRAM region
+  size_t page_dram_region = dram_region_for(phys_addr);
+  if (!read_enclave_region_bitmap_bit(enclave_id, page_dram_region)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
+
+  uintptr_t ptb = enclave_info->*(&enclave_info_t::loading_eptbr);
+  uintptr_t entry_addr = walk_page_table_to_entry(ptb, virtual_addr, 0);
+  if (entry_addr == 0 || is_valid_page_table_entry(entry_addr, 0)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_state;
+  }
+
+  // NOTE: we're performing the OS DRAM region checks last to minimize the
+  //       number of times we have two release two locks when bailing out due
+  //       to errors
+  size_t os_dram_region = dram_region_for(os_addr);
+  if (os_dram_region == dram_region) {
+    clear_dram_region_lock(dram_region);
+    return monitor_access_denied;
+  }
+  if (test_and_set_dram_region_lock(os_dram_region)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_concurrent_call;
+  }
+
+  // NOTE: even though we're reading the DRAM region ownership atomically, we
+  //       still need to lock the region to make sure that it doesn't go away
+  //       while we bcopy a page out of it
+  phys_ptr<dram_region_info_t> region = &g_dram_region[os_dram_region];
+  if (read_dram_region_owner(dram_region) != null_enclave_id) {
+    clear_dram_region_lock(os_dram_region);
+    clear_dram_region_lock(dram_region);
+    return monitor_access_denied;
+  }
+
+  enclave_info->*(&enclave_info_t::loading_last_addr) += 1;
+  bcopy(phys_ptr<size_t>{phys_addr}, phys_ptr<size_t>{os_addr}, page_size());
+  clear_dram_region_lock(os_dram_region);
+
+  // TODO: measure the operation
+
+  clear_dram_region_lock(dram_region);
   return monitor_ok;
 }
 
@@ -282,22 +376,11 @@ api_result_t debug_enclave_copy_page(enclave_id_t enclave_id,
   }
 
   api_result_t result = monitor_ok;
-  phys_ptr<dram_region_info_t> region = &g_dram_region[enclave_dram_region];
-  if (region->*(&dram_region_info_t::state) != dram_region_owned)
+  if (read_dram_region_owner(enclave_dram_region) != enclave_id)
     result = monitor_invalid_value;
-  if (atomic_load(&(region->*(&dram_region_info_t::owner))) != enclave_id)
+  if (read_dram_region_owner(enclave_addr_dram_region) != enclave_id)
     result = monitor_invalid_value;
-
-  region = &g_dram_region[enclave_addr_dram_region];
-  if (region->*(&dram_region_info_t::state) != dram_region_owned)
-    result = monitor_invalid_value;
-  if (atomic_load(&(region->*(&dram_region_info_t::owner))) != enclave_id)
-    result = monitor_invalid_value;
-
-  region = &g_dram_region[os_addr_dram_region];
-  if (region->*(&dram_region_info_t::state) != dram_region_owned)
-    result = monitor_invalid_value;
-  if (atomic_load(&(region->*(&dram_region_info_t::owner))) != null_enclave_id)
+  if (read_dram_region_owner(os_addr_dram_region) != null_enclave_id)
     result = monitor_invalid_value;
 
   phys_ptr<enclave_info_t> enclave_info{enclave_id};

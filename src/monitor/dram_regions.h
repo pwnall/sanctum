@@ -19,7 +19,6 @@ using sanctum::bare::uintptr_t;
 // Per-DRAM region accounting information.
 struct dram_region_info_t {
   atomic_flag lock;             // lock for all the DRAM region's state
-  size_t state;                 // actually a dram_region_state_t
   atomic<enclave_id_t> owner;   // nullptr if not owned by enclave
   enclave_id_t previous_owner;  // nullptr if previously owned by OS
   size_t monitor_pages;         // pages reserved for the monitor
@@ -61,8 +60,17 @@ extern size_t g_dram_region_count;
 // This is ceil(g_dram_region_count / (sizeof(size_t) * 8)).
 extern size_t g_dram_region_bitmap_words;
 
-// Sets up the DRAM region constants.
-void boot_init_dram_regions();
+
+// The special enclave ID values below are used to make it possible to infer a
+// DRAM region's state by doing an atomic read over its owner field. The values
+// will not be validated by is_valid_enclave_id() because it will extract DRAM
+// region 0 from the ID, and the owner of DRAM region 0 is always 0 (the OS).
+
+// The enclave ID used as the owner of a blocked DRAM region.
+constexpr enclave_id_t blocked_enclave_id = 1;
+
+// The enclave ID used as the owner of a free DRAM region.
+constexpr enclave_id_t free_enclave_id = 2;
 
 };  // namespace sanctum::internal
 };  // namespace sanctum
