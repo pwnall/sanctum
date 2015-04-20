@@ -21,11 +21,18 @@ using sanctum::bare::bzero;
 using sanctum::bare::atomic_fetch_add;
 using sanctum::bare::is_page_aligned;
 using sanctum::bare::page_size;
+using sanctum::bare::page_shift;
+using sanctum::bare::page_table_levels;
+using sanctum::bare::page_table_size;
 using sanctum::bare::phys_ptr;
+using sanctum::bare::size_t;
+using sanctum::bare::uintptr_t;
+using sanctum::bare::write_page_table_entry;
 using sanctum::internal::clamped_dram_region_for;
 using sanctum::internal::clear_dram_region_lock;
 using sanctum::internal::core_info_t;
 using sanctum::internal::current_core_info;
+using sanctum::internal::dram_region_for;
 using sanctum::internal::dram_region_info_t;
 using sanctum::internal::dram_region_start;
 using sanctum::internal::enclave_info_t;
@@ -36,11 +43,14 @@ using sanctum::internal::enclave_thread_slots;
 using sanctum::internal::g_dram_region;
 using sanctum::internal::g_dram_region_shift;
 using sanctum::internal::is_dram_address;
+using sanctum::internal::is_enclave_virtual_address;
 using sanctum::internal::is_valid_range;
 using sanctum::internal::is_valid_enclave_id;
+using sanctum::internal::read_enclave_region_bitmap_bit;
 using sanctum::internal::test_and_set_dram_region_lock;
 using sanctum::internal::thread_private_info_t;
 using sanctum::internal::thread_slot_t;
+using sanctum::internal::walk_page_table_to_entry;
 
 namespace sanctum {
 namespace internal {  // sanctum::internal
@@ -93,9 +103,13 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
 
     enclave_info->*(&enclave_info_t::is_debug) = 0;
 
+    enclave_info->*(&enclave_info_t::ev_base) = ev_base;
+    enclave_info->*(&enclave_info_t::ev_mask) = ev_mask;
+    enclave_info->*(&enclave_info_t::is_initialized) = 0;
     enclave_info->*(&enclave_info_t::loading_eptbr) = 0;
     enclave_info->*(&enclave_info_t::loading_last_addr) = 0;
-    enclave_info->*(&enclave_info_t::is_initialized) = 0;
+    enclave_info->*(&enclave_info_t::monitor_area_top) = enclave_id +
+      (monitor_area_pages << page_shift());
 
     // TODO: attestation
   } else {
@@ -107,7 +121,15 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
 }
 
 api_result_t load_enclave_page_table(enclave_id_t enclave_id,
-    uintptr_t phys_addr, uintptr_t virtual_addr, int lvl) {
+    uintptr_t phys_addr, uintptr_t virtual_addr, size_t level, size_t acl) {
+
+  if (!is_dram_address(phys_addr))
+    return monitor_invalid_value;
+  // NOTE: we need to check the level to avoid an infinite loop; we don't do
+  //       any unnecessary checking on measured arguments
+  if (level >= page_table_levels())
+    return monitor_invalid_value;
+
   size_t dram_region = clamped_dram_region_for(enclave_id);
   if (test_and_set_dram_region_lock(dram_region))
     return monitor_concurrent_call;
@@ -120,13 +142,56 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
   }
 
   phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  if (enclave_info->*(&enclave_info_t::is_initialized) != 0) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_state;
+  }
   if (phys_addr <= enclave_info->*(&enclave_info_t::loading_last_addr)) {
     clear_dram_region_lock(dram_region);
     return monitor_invalid_value;
   }
+  if (level != page_table_levels() - 1 &&
+      !is_enclave_virtual_address(virtual_addr, enclave_id)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
 
-  // TODO: page walk
+  uintptr_t monitor_area_top =
+      enclave_info->*(&enclave_info_t::monitor_area_top);
+  if (phys_addr >= enclave_id && phys_addr <= monitor_area_top) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
 
+  // NOTE: we don't need to lock the DRAM region of the physical address,
+  //       because an enclave cannot relinquish its DRAM regions until it is
+  //       initialized and running; therefore, once the DRAM region is assigned
+  //       and its bit is set in the enclave's region bitmap, we know the DRAM
+  //       region will stay with the enclave until initialization completes
+  size_t page_dram_region = dram_region_for(phys_addr);
+  if (!read_enclave_region_bitmap_bit(enclave_id, page_dram_region)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
+
+  size_t walk_level = page_table_levels() - 1;
+  if (level == page_table_levels() - 1) {
+    enclave_info->*(&enclave_info_t::loading_eptbr) = phys_addr;
+    // NOTE: we completely ignore virtual_addr here; we don't bother checking
+    //       that it's zero because the call gets measured
+  } else {
+    uintptr_t ptb = enclave_info->*(&enclave_info_t::loading_eptbr);
+    uintptr_t entry_addr = walk_page_table_to_entry(ptb, virtual_addr, level);
+    if (entry_addr == 0) {
+      clear_dram_region_lock(dram_region);
+      return monitor_invalid_state;
+    }
+    write_page_table_entry(entry_addr, level, phys_addr, acl);
+  }
+
+  enclave_info->*(&enclave_info_t::loading_last_addr) +=
+      page_table_size(level);
+  bzero(phys_ptr<size_t>{phys_addr}, page_table_size(level));
   return monitor_ok;
 }
 

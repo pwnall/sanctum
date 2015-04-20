@@ -5,12 +5,12 @@ namespace sanctum {
 namespace bare {
 
 template<> inline phys_ref<size_t>::operator size_t() const {
-  // TODO: actual asm intrinsic
+  // TODO: asm intrinsic
   return 0;
 }
 template<> inline phys_ref<size_t>& phys_ref<size_t>::
     operator =(const size_t& value) {
-  // TODO: actual asm intrinsic
+  // TODO: asm intrinsic
   return *this;
 }
 

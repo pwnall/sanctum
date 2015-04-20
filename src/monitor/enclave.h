@@ -9,11 +9,11 @@ namespace sanctum {
 namespace internal {
 
 using sanctum::api::enclave::thread_info_t;
-using sanctum::bare::size_t;
-using sanctum::bare::uintptr_t;
 using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
 using sanctum::bare::phys_ptr;
+using sanctum::bare::size_t;
+using sanctum::bare::uintptr_t;
 
 // Extended version of thred_info_t.
 struct thread_private_info_t {
@@ -44,6 +44,12 @@ struct enclave_info_t {
   // Thread IDs are between 1 and max_threads.
   size_t max_threads;
 
+  // The base of the enclave's virtual address range.
+  uintptr_t ev_base;
+
+  // The mask of the enclave's virtual address range.
+  uintptr_t ev_mask;
+
   // non-zero when the enclave was initialized and can execute threads.
   // NOTE: this isn't bool because we don't want to specialize phys_ptr<bool>.
   size_t is_initialized;
@@ -59,6 +65,9 @@ struct enclave_info_t {
 
   // The phyiscal address of the last page loaded into the enclave by the OS.
   uintptr_t loading_last_addr;
+
+  // The end of the monitor area at the beginning of the enclave.
+  uintptr_t monitor_area_top;
 
   // Number of enclave threads running on cores.
   //

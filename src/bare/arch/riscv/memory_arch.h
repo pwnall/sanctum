@@ -36,5 +36,4 @@ template<typename T> inline void bcopy(phys_ptr<T> dest, phys_ptr<T> source,
 
 };  // namespace sanctum::bare
 };  // namespace sanctum
-
 #endif  // !defined(BARE_ARCH_RISCV_MEMORY_ARCH_H_INCLUDED)

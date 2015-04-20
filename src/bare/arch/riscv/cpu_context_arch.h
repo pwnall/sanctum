@@ -27,5 +27,4 @@ struct enclave_exit_state_t {
 
 };  // namespace sanctum::bare
 };  // namespace sanctum
-
 #endif  // !defined(BARE_ARCH_RISCV_CPU_CONTEXT_ARCH_H_INCLUDED)

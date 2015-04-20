@@ -55,12 +55,12 @@ TEST(BitMaskingTest, IsValidRange) {
 TEST(BitMaskingTest, IsPageAligned) {
   ASSERT_EQ(true, is_page_aligned(0));
   ASSERT_EQ(false, is_page_aligned(1));
-  ASSERT_EQ(true, is_page_aligned(0x1000));
-  ASSERT_EQ(false, is_page_aligned(0x1001));
   ASSERT_EQ(true, is_page_aligned(0x2000));
   ASSERT_EQ(false, is_page_aligned(0x2001));
-  ASSERT_EQ(true, is_page_aligned(0x3000));
-  ASSERT_EQ(false, is_page_aligned(0x2800));
+  ASSERT_EQ(true, is_page_aligned(0x4000));
+  ASSERT_EQ(false, is_page_aligned(0x4001));
+  ASSERT_EQ(true, is_page_aligned(0x6000));
+  ASSERT_EQ(false, is_page_aligned(0x7000));
 }
 
 TEST(BitMaskingTest, AddressBitsFor) {

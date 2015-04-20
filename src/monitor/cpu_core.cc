@@ -2,8 +2,8 @@
 
 #include "cpu_core_inl.h"
 
-using sanctum::bare::size_t;
 using sanctum::bare::phys_ptr;
+using sanctum::bare::size_t;
 
 namespace sanctum {
 namespace internal {

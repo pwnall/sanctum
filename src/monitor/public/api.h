@@ -146,6 +146,8 @@ api_result_t dram_region_flush();
 // `debug` is set for debug enclaves. The security monitor allows debug reads
 // and writes in debug enclaves, to facilitate testing and debugging.
 //
+// All arguments become a part of the enclave's measurement.
+//
 // Returns an enclave ID, or null_enclave_id in case of an error.
 enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
     uintptr_t ev_mask, size_t max_thread_count, bool debug);
@@ -159,22 +161,24 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
 // `virtual_addr` is the lowest virtual address mapped by the newly created
 // page table.
 //
-// `lvl` indicates the page table level (e.g., in x86, 1 for PT, 2 for PD, 3
-// for PDPT).
+// `level` indicates the page table level (e.g., in x86, 0 for PT, 1 for PD, 2
+// for PDPT, 3 for PML).
 //
-// This API will not check if a page table entry was already created for the
-// given virtual address and level. It is assumed that the enclave creator will
-// not expect duplicate calls
+// `virtual_addr`, `level` and `acl` become a part of the enclave's
+// measurement.
 api_result_t load_enclave_page_table(enclave_id_t enclave_id,
-    uintptr_t phys_addr, uintptr_t virtual_addr, int lvl);
+    uintptr_t phys_addr, uintptr_t virtual_addr, size_t level, uintptr_t acl);
 
 // Allocates and initializes a page in the enclave's main DRAM region.
 //
 // `phys_addr` must be higher than the last physical address passed to a
 // load_enclave_ function, must be page-aligned, and must point into a DRAM
 // region owned by the enclave.
+//
+// `virtual_addr`, `acl`, and the contents of the page at `os_addr` become a
+// part of the enclave's measurement.
 api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
-    uintptr_t virtual_addr, uintptr_t os_addr, uintptr_t access_bits);
+    uintptr_t virtual_addr, uintptr_t os_addr, uintptr_t acl);
 
 // Creates a hardware thread in an enclave.
 thread_id_t load_enclave_thread(enclave_id_t enclave_id, thread_id_t thread_id,

@@ -6,6 +6,10 @@
 #include "dram_regions.h"
 #include "enclave.h"
 
+using sanctum::api::null_enclave_id;
+using sanctum::api::os::dram_region_owned;
+using sanctum::bare::atomic_flag_clear;
+using sanctum::bare::atomic_init;
 using sanctum::bare::address_bits_for;
 using sanctum::bare::is_shared_cache;
 using sanctum::bare::page_shift;
@@ -17,6 +21,8 @@ using sanctum::bare::read_dram_size;
 using sanctum::bare::read_min_cache_index_shift;
 using sanctum::bare::read_max_cache_index_shift;
 using sanctum::bare::set_cache_index_shift;
+using sanctum::bare::size_t;
+using sanctum::bare::uintptr_t;
 
 namespace sanctum {
 namespace internal {
@@ -95,12 +101,25 @@ void boot_init_dynamic_arrays() {
 
   g_dram_region = phys_ptr<dram_region_info_t>{g_monitor_top};
   g_monitor_top = uintptr_t(g_dram_region + g_dram_region_count);
+  for (size_t i = 0; i < g_dram_region_count; ++i) {
+    phys_ptr<dram_region_info_t> region{g_dram_region + i};
+    atomic_flag_clear(&(region->*(&dram_region_info_t::lock)));
+    region->*(&dram_region_info_t::state) = dram_region_owned;
+    atomic_init(&(region->*(&dram_region_info_t::owner)), null_enclave_id);
+    region->*(&dram_region_info_t::previous_owner) = null_enclave_id;
+    region->*(&dram_region_info_t::monitor_pages) = 0;
+    region->*(&dram_region_info_t::pinned_pages) = 0;
+    region->*(&dram_region_info_t::blocked_at) = 0;
+  }
 
   g_dram_regions = phys_ptr<dram_regions_info_t>{g_monitor_top};
   g_monitor_top = uintptr_t(g_dram_regions + 1);
+  atomic_init(&(g_dram_regions->*(&dram_regions_info_t::block_clock)),
+      static_cast<size_t>(0));
 
   g_os_region_bitmap = phys_ptr<size_t>{g_monitor_top};
   g_monitor_top = uintptr_t(g_os_region_bitmap + g_dram_region_bitmap_words);
+  bzero(g_os_region_bitmap, sizeof(size_t) * g_dram_region_bitmap_words);
 }
 
 };  // namespace sanctum::internal
