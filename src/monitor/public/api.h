@@ -20,7 +20,6 @@ constexpr enclave_id_t null_enclave_id = 0;
 
 // A thread ID is the index of the thread's info structure pointer in an array.
 typedef size_t thread_id_t;
-constexpr thread_id_t null_thread_id = 0;
 
 // Error codes returned from monitor API calls.
 typedef enum {
@@ -106,6 +105,8 @@ api_result_t block_dram_region(size_t dram_region);
 // used for monitor implementation-specific data.
 size_t thread_info_pages();
 
+// The number of pages used by the enclave attestation process.
+size_t attestation_area_pages();
 
 namespace enclave {  // sanctum::api::enclave
 
@@ -127,8 +128,17 @@ api_result_t create_enclave_thread(thread_id_t thread_id, uintptr_t phys_addr);
 // The thread must not be running on any core.
 api_result_t delete_enclave_thread(thread_id_t thread_id);
 
-// Ends an enclave thread and returns control to the OS.
+// Ends the currently running enclave thread and returns control to the OS.
 api_result_t exit_enclave();
+
+// Performs enclave attestation.
+//
+// The calling thread must be the only hardware thread running inside the
+// enclave.
+//
+// `phys_addr` must point into a buffer of attestation_area_pages() pages
+// contained in DRAM regions that belong to the enclave.
+api_result_t attest_enclave(uintptr_t phys_addr);
 
 // Enclave-supplied metadata for each hardware thread in an enclave.
 //
@@ -252,7 +262,8 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
 // must not be used by another hardware thread.
 //
 // `virtual_addr` must point to thread_info_pages() pages of virtual memory
-// that was previously initialized by calling load_enclave_page().
+// that was previously initialized by calling load_enclave_page(). The address
+// must be page-aligned.
 //
 // The virtual memory buffer pointed by `virtual_addr` must map to a contiguous
 // range of physical memory pages that belong to the same DRAM region,
@@ -262,10 +273,15 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
 
 // Marks the given enclave as initialized and ready to execute.
 //
-// `enclave_id` must be an enclave that has not yet been initialized.
+// `enclave_id` must identify an enclave that has not yet been initialized.
 api_result_t init_enclave(enclave_id_t enclave_id);
 
 // Starts an enclave thread.
+//
+// `enclave_id` must identify an enclave that has been initialized.
+//
+// `thread_id` must identify a hardware thread that was created but is not
+// executing on any core.
 api_result_t run_enclave_thread(enclave_id_t enclave_id,
     thread_id_t thread_id);
 
@@ -274,7 +290,6 @@ api_result_t run_enclave_thread(enclave_id_t enclave_id,
 // This can only be called when no enclave thread is running on any core. The
 // API wipes the DRAM regions belonging to the enclave and marks them as free.
 api_result_t delete_enclave(enclave_id_t enclave_id);
-
 
 // Reads/writes a page from/to a debug enclave's memory.
 //

@@ -357,7 +357,9 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
     // NOTE: The physical page is guaranteed to belong to an enclave's DRAM
     //       region, because it was obtained from a page walk on the enclave's
     //       page tables, which are trusted before the enclave initializes.
-    //       So, we don't need to check DRAM region ownership.
+    //       So, we don't need to check DRAM region ownership. We also don't
+    //       need to ensure that the virtual addresses don't point to
+    //       monitor-reserved pages.
   }
   if (!is_supported_mapping) {
     clear_dram_region_lock(dram_region);

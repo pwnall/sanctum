@@ -36,6 +36,7 @@ using sanctum::internal::current_enclave;
 using sanctum::internal::dram_region_for;
 using sanctum::internal::dram_region_info_t;
 using sanctum::internal::dram_region_start;
+using sanctum::internal::enclave_attestation_pages;
 using sanctum::internal::enclave_info_t;
 using sanctum::internal::enclave_region_bitmap;
 using sanctum::internal::enclave_thread_slot;
@@ -66,6 +67,10 @@ namespace api {  // sanctum::api
 
 size_t thread_info_pages() {
   return thread_private_info_pages();
+}
+
+size_t attestation_area_pages() {
+  return enclave_attestation_pages();
 }
 
 };  // namespace sanctum::api
@@ -300,15 +305,23 @@ api_result_t create_enclave_thread(thread_id_t thread_id,
   if (test_and_set_dram_region_lock(dram_region))
     return monitor_concurrent_call;
 
-  phys_ptr<size_t> region_bitmap = enclave_region_bitmap(enclave_id);
   size_t thread_dram_region = dram_region_for(phys_addr);
-  for (uintptr_t page_addr = phys_addr + page_size();
-       page_addr < phys_end; page_addr += page_size()) {
+  if (!read_bitmap_bit(enclave_region_bitmap(enclave_id),
+      thread_dram_region)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_state;
+  }
+  for (uintptr_t page_addr = phys_addr; page_addr < phys_end;
+       page_addr += page_size()) {
     if (dram_region_for(page_addr) != thread_dram_region) {
       // See load_enclave_thread() for the reasons why we don't support thread
       // metadata spanning multiple DRAM regions.
       clear_dram_region_lock(dram_region);
       return monitor_unsupported;
+    }
+    if (is_enclave_monitor_address(page_addr, enclave_id)) {
+      clear_dram_region_lock(dram_region);
+      return monitor_invalid_value;
     }
   }
 
@@ -427,6 +440,56 @@ api_result_t exit_enclave() {
 
   // TODO: modify return state to return to the run_enclave_thread() caller
 
+  return monitor_ok;
+}
+
+api_result_t attest_enclave(uintptr_t phys_addr) {
+  if (!is_page_aligned(phys_addr))
+    return monitor_invalid_value;
+  if (!is_dram_address(phys_addr))
+    return monitor_invalid_value;
+
+  uintptr_t phys_end = phys_addr + thread_private_info_size();
+  // NOTE: The attestation area occupies contiguous space in physical memory,
+  //       so we only need to check the end for DRAM inclusion. The
+  //       intermediate pages are guaranteed to be in DRAM.
+  if (!is_dram_address(phys_end - 1))
+    return monitor_invalid_value;
+
+  enclave_id_t enclave_id = current_enclave();
+  size_t dram_region = dram_region_for(enclave_id);
+  if (test_and_set_dram_region_lock(dram_region))
+    return monitor_concurrent_call;
+
+  phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  if (atomic_load(&(enclave_info->*(&enclave_info_t::running_threads))) != 1) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_state;
+  }
+
+  // NOTE: We don't need to lock the attestation area's DRAM regions because we
+  //       have the enclave's DRAM region lock, so no DRAM regions cannot be
+  //       added to or removed (blocked) from the enclave while this call is
+  //       happening.
+
+  phys_ptr<size_t> region_bitmap = enclave_region_bitmap(enclave_id);
+  size_t thread_dram_region = dram_region_for(phys_addr);
+  for (uintptr_t page_addr = phys_addr; page_addr < phys_end;
+       page_addr += page_size()) {
+    size_t page_dram_region = dram_region_for(page_addr);
+    if (!read_bitmap_bit(region_bitmap, page_dram_region)) {
+      clear_dram_region_lock(dram_region);
+      return monitor_invalid_state;
+    }
+    if (is_enclave_monitor_address(page_addr, enclave_id)) {
+      clear_dram_region_lock(dram_region);
+      return monitor_invalid_value;
+    }
+  }
+
+  // TODO: attestation crypto
+
+  clear_dram_region_lock(dram_region);
   return monitor_ok;
 }
 

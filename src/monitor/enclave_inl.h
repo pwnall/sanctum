@@ -180,6 +180,11 @@ inline uintptr_t walk_page_tables(uintptr_t ptb, uintptr_t virtual_addr) {
   return page_table_entry_target(entry_addr, 0);
 }
 
+// Number of pages used by the enclave attestation process.
+inline size_t enclave_attestation_pages() {
+  return 0;  // TODO: actual number when we have attestation code
+}
+
 };  // namespace sanctum::internal
 };  // namespace sanctum
 #endif  // !defined(MONITOR_ENCLAVE_INL_H_INCLUDED)
