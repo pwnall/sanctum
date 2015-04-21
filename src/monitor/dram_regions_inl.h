@@ -3,6 +3,7 @@
 
 #include "bare/bit_masking.h"
 #include "bare/cpu_context.h"
+#include "bare/memory.h"
 #include "cpu_core.h"
 #include "dram_regions.h"
 
@@ -14,6 +15,7 @@ using sanctum::api::null_enclave_id;
 using sanctum::api::os::dram_region_state_t;
 using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
+using sanctum::bare::bzero;
 using sanctum::bare::is_valid_range;
 using sanctum::bare::phys_ptr;
 using sanctum::bare::read_bitmap_bit;
@@ -107,6 +109,16 @@ inline bool is_dram_address(uintptr_t address) {
 inline enclave_id_t read_dram_region_owner(size_t dram_region) {
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
   return atomic_load(&(region->*(&dram_region_info_t::owner)));
+}
+
+// Wipes the data in a DRAM region.
+inline void bzero_dram_region(size_t dram_region) {
+  uintptr_t dram_strip_step = g_dram_region_mask + 1;
+  uintptr_t region_start = dram_region << g_dram_region_shift;
+  for (uintptr_t strip = 0; strip < g_dram_size; strip += dram_strip_step) {
+    uintptr_t strip_start = strip | region_start;
+    bzero(phys_ptr<size_t>{strip_start}, (1 << g_dram_region_shift));
+  }
 }
 
 // Flushes the core's TLBs and updates the relevant flush generation counter.

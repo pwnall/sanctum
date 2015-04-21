@@ -110,19 +110,38 @@ inline bool is_enclave_monitor_address(uintptr_t addr,
       addr <= enclave_info->*(&enclave_info_t::monitor_area_top);
 }
 
+// The size of an enclave hardware thread's metadata, in bytes.
+constexpr inline size_t thread_private_info_size() {
+  return sizeof(thread_private_info_t);
+}
+
+// The number of pages taken by an enclave hardware thread's metadata.
+//
+// This should be optimized to a constant by the compiler, but isn't constexpr
+// because of pointer arithmetic.
+constexpr inline size_t thread_private_info_pages() {
+  return (thread_private_info_size() + page_size() - 1) >> page_shift();
+}
+
 // Walks a page table, stops at the entry at a given level.
 //
 // The level is assumed to be valid (between 0 and page_table_levels() - 1).
 // The ptb (page table base) and the page tables are all assumed to point to
-// accessible memory. This assumption only holds while an enclave is
-// initialized and the monitor is in charge of its page tables.
+// accessible memory. This assumption only holds before an enclave is
+// initialized, when the monitor is in charge of its page tables.
 //
 // Returns 0 if the walk was interrupted due to a page table entry not being
 // valid / present.
-inline uintptr_t walk_page_table_to_entry(uintptr_t ptb,
+inline uintptr_t walk_page_tables_to_entry(uintptr_t ptb,
     uintptr_t virtual_addr, size_t level) {
-  size_t table_addr = ptb;
   size_t addr_shift = page_table_translated_bits();
+  size_t table_addr = ptb;
+
+  // NOTE: We're handling the special case of an unset PTB (page table base)
+  //       here because it's equivalent to the valid bit being unset on an
+  //       entry in the page tables.
+  if (ptb == 0)
+    return 0;
 
   size_t walk_level = page_table_levels();
   while (true) {
@@ -147,13 +166,13 @@ inline uintptr_t walk_page_table_to_entry(uintptr_t ptb,
 //
 // The level is assumed to be valid (between 0 and page_table_levels() - 1).
 // The ptb (page table base) and the page tables are all assumed to point to
-// accessible memory. This assumption only holds while an enclave is
-// initialized and the monitor is in charge of its page tables.
+// accessible memory. This assumption only holds before an enclave is
+// initialized, when the monitor is in charge of its page tables.
 //
 // Returns 0 if the walk was interrupted due to a page table entry not being
 // valid / present.
-inline uintptr_t walk_page_table(uintptr_t ptb, uintptr_t virtual_addr) {
-  uintptr_t entry_addr = walk_page_table_to_entry(ptb, virtual_addr, 0);
+inline uintptr_t walk_page_tables(uintptr_t ptb, uintptr_t virtual_addr) {
+  uintptr_t entry_addr = walk_page_tables_to_entry(ptb, virtual_addr, 0);
   if (entry_addr == 0)
     return 0;
   if (!is_valid_page_table_entry(entry_addr, 0))

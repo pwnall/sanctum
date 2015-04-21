@@ -45,7 +45,7 @@ template<typename T> inline void bzero(phys_ptr<T> start, size_t bytes) {
   assert(uintptr_t(start + words) <= testing::phys_buffer_size);
 
   phys_ptr<T> end = start + words;
-  for(; start != end; start += 1)
+  for (; start != end; start += 1)
     *start = T{0};
 }
 template<typename T> inline void bcopy(phys_ptr<T> dest, phys_ptr<T> source,
@@ -59,7 +59,7 @@ template<typename T> inline void bcopy(phys_ptr<T> dest, phys_ptr<T> source,
       uintptr_t(dest + words) <= uintptr_t(source));
 
   phys_ptr<T> end = source + words;
-  for(; source != end; source += 1, dest += 1)
+  for (; source != end; source += 1, dest += 1)
     *dest = *source;
 }
 

@@ -24,11 +24,48 @@ constexpr thread_id_t null_thread_id = 0;
 
 // Error codes returned from monitor API calls.
 typedef enum {
+  // API call succeeded.
   monitor_ok = 0,
+
+  // A parameter given to the API call was invalid.
+  //
+  // This most likely reflects a bug in the caller code.
   monitor_invalid_value = 1,
+
+  // A resource referenced by the API call is in an unsuitable state.
+  //
+  // The API call will not succeed if the caller simply retries it. However,
+  // the caller may be able to perform other API calls to get the resources in
+  // a state that will allow this call to succeed.
   monitor_invalid_state = 2,
+
+  // Failed to acquire a lock. Retrying with the same arguments might succeed.
+  //
+  // The monitor returns this instead of blocking a hardware thread when a
+  // resource lock is acquired by another thread. This approach eliminates any
+  // possibility of having the monitor deadlock. The caller is responsible for
+  // retrying the API call.
+  //
+  // This is also sometime returned instead of monitor_invalid_value, in the
+  // interest of reducing edge cases in monitor implementation.
   monitor_concurrent_call = 3,
-  monitor_access_denied = 4
+
+  // The caller is not allowed to access a resource referenced by the API call.
+  //
+  // This is a more specific version of monitor_invalid_value. The monitor does
+  // its best to identify these cases, but may fail.
+  monitor_access_denied = 4,
+
+  // The current monitor implementation does not support the request.
+  //
+  // The caller made a reasonable API request that exercises an unhandled edge
+  // case in the monitor implementaiton. Some edge cases that would require
+  // complex or difficult-to-test implementations are detected and handled by
+  // returning monitor_unsupported.
+  //
+  // The documentation for API calls states the edge cases that result in a
+  // monitor_unsupported response.
+  monitor_unsupported = 5,
 } api_result_t;
 
 // The amount of DRAM installed on the system.
@@ -63,6 +100,12 @@ size_t dram_region_mask();
 // locked.
 api_result_t block_dram_region(size_t dram_region);
 
+// The number of pages used by a hardware thread metadata.
+//
+// The metadata area starts with a thread_info_t structure. The rest of it is
+// used for monitor implementation-specific data.
+size_t thread_info_pages();
+
 
 namespace enclave {  // sanctum::api::enclave
 
@@ -87,12 +130,24 @@ api_result_t delete_enclave_thread(thread_id_t thread_id);
 // Ends an enclave thread and returns control to the OS.
 api_result_t exit_enclave();
 
-// Metadata for each hardware thread in an enclave.
+// Enclave-supplied metadata for each hardware thread in an enclave.
+//
+// The enclave-supplied metadata is followed by monitor implementation-specific
+// metadata, which should not be modified.
 typedef struct {
+  // The virtual address of the thread's entry point.
   void (*entry_point)();
+  // The virtual address of the thread's stack top.
   void *entry_stack;
+  // The virtual address of the thread's fault handler.
   void (*fault_handler)();
+  // The virtual address of the fault handler's stack top.
   void *fault_stack;
+
+  // The EPTBR value to be loaded for this thread.
+  //
+  // The EPTBR contains the physical address of the enclave's page table base.
+  uintptr_t eptbr;
 
   //enclave_exit_state_t exit_state;
 } thread_info_t;
@@ -111,6 +166,8 @@ typedef enum {
 } dram_region_state_t;
 
 // The state of the DRAM region with the given index.
+//
+// Returns dram_region_invalid if the given DRAM region index is invalid.
 dram_region_state_t dram_region_state(size_t dram_region);
 
 // The owner of the DRAM region with the given index.
@@ -154,6 +211,8 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
 
 // Allocates a page in the enclave's main DRAM region for page tables.
 //
+// `enclave_id` must be an enclave that has not yet been initialized.
+//
 // `phys_addr` must be higher than the last physical address passed to a
 // load_enclave_ function, must be page-aligned, and must point into a DRAM
 // region owned by the enclave.
@@ -171,6 +230,8 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
 
 // Allocates and initializes a page in the enclave's main DRAM region.
 //
+// `enclave_id` must be an enclave that has not yet been initialized.
+//
 // `phys_addr` must be higher than the last physical address passed to a
 // load_enclave_ function, must be page-aligned, and must point into a DRAM
 // region owned by the enclave.
@@ -181,10 +242,22 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
     uintptr_t virtual_addr, uintptr_t os_addr, uintptr_t acl);
 
 // Creates a hardware thread in an enclave.
-thread_id_t load_enclave_thread(enclave_id_t enclave_id, thread_id_t thread_id,
-      uintptr_t thread_info_addr);
+//
+// `enclave_id` must be an enclave that has not yet been initialized.
+//
+// `thread_id` must be smaller than the enclave's maximum thread count, and
+// must not be used by another hardware thread.
+//
+// `virtual_addr` must point to virtual memory that was previously initialized
+// by calling load_enclave_page(). The virtual memory must point to a
+// contiguous range of physical memory pages long enough to hold a thread_info
+// structure.
+api_result_t load_enclave_thread(enclave_id_t enclave_id,
+    thread_id_t thread_id, uintptr_t virtual_addr);
 
 // Marks the given enclave as initialized and ready to execute.
+//
+// `enclave_id` must be an enclave that has not yet been initialized.
 api_result_t init_enclave(enclave_id_t enclave_id);
 
 // Starts an enclave thread.

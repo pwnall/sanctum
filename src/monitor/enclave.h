@@ -23,7 +23,6 @@ struct thread_private_info_t {
   atomic_flag exit_state_used;  // Set on AEX.
 };
 
-
 // Pointers to threads.
 struct thread_slot_t {
   phys_ptr<thread_private_info_t> thread_info;

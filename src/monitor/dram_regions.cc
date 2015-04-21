@@ -184,7 +184,7 @@ api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
   }
 
   size_t new_owner_dram_region = dram_region_for(new_owner);
-  // NOTE: We don't need to check that new_owner_dram_region is the same as
+  // NOTE: We don't need to check if new_owner_dram_region is the same as
   //       dram_region. If that's the case, we'll simply fail to acquire the
   //       lock and return concurrent_call. This is acceptable. Ideally, we'd
   //       return invalid_value, but that'd increase code size.

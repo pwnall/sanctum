@@ -15,6 +15,7 @@
       'dram_regions_inl.h',
       'enclave.cc',
       'enclave.h',
+      'enclave_init.cc',
       'enclave_inl.h',
       'public/api.h',
     ],
