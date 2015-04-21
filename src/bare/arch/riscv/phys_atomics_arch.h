@@ -56,6 +56,11 @@ inline template<> uintptr_t atomic_fetch_add(
   // TODO: asm intrinsic
   return 0;
 }
+inline template<> uintptr_t atomic_fetch_sub(
+    phys_ptr<atomic<uintptr_t>> object, uintptr_t value) noexcept {
+  // TODO: asm intrinsic
+  return 0;
+}
 
 
 };  // namespace sanctum::bare

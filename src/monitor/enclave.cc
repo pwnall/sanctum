@@ -14,6 +14,7 @@ using sanctum::api::monitor_concurrent_call;
 using sanctum::api::monitor_invalid_state;
 using sanctum::api::monitor_invalid_value;
 using sanctum::api::enclave_id_t;
+using sanctum::api::enclave::thread_info_t;
 using sanctum::api::os::dram_region_free;
 using sanctum::api::os::dram_region_owned;
 using sanctum::api::thread_id_t;
@@ -21,6 +22,9 @@ using sanctum::bare::atomic_fetch_add;
 using sanctum::bare::is_page_aligned;
 using sanctum::bare::page_size;
 using sanctum::bare::phys_ptr;
+using sanctum::bare::set_eptbr;
+using sanctum::bare::set_ev_base;
+using sanctum::bare::set_ev_mask;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 using sanctum::internal::bzero_dram_region;
@@ -175,9 +179,9 @@ api_result_t run_enclave_thread(enclave_id_t enclave_id,
     return monitor_concurrent_call;
   }
 
-  phys_ptr<thread_private_info_t> thread =
+  phys_ptr<thread_private_info_t> private_thread =
       slot->*(&thread_slot_t::thread_info);
-  if (thread == phys_ptr<thread_private_info_t>::null()) {
+  if (private_thread == phys_ptr<thread_private_info_t>::null()) {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
     return monitor_invalid_state;
@@ -190,11 +194,14 @@ api_result_t run_enclave_thread(enclave_id_t enclave_id,
   phys_ptr<core_info_t> core{current_core_info()};
   core->*(&core_info_t::enclave_id) = enclave_id;
   core->*(&core_info_t::thread_id) = thread_id;
-  core->*(&core_info_t::thread) = thread;
-  set_eptbr(enclave_info->*(&enclave_info_t::loading_eptbr));
+  core->*(&core_info_t::thread) = private_thread;
+  phys_ptr<thread_info_t> thread{
+      &(private_thread->*(&thread_private_info_t::ti))};
+  set_ev_base(enclave_info->*(&enclave_info_t::ev_base));
+  set_ev_mask(enclave_info->*(&enclave_info_t::ev_mask));
+  set_eptbr(thread->*(&thread_info_t::eptbr));
 
-
-  // TODO: modify the CPU state to perform an enclave jump
+  // TODO: modify return state to perform an enclave jump
 
   return monitor_ok;
 }
@@ -326,7 +333,11 @@ api_result_t create_enclave_thread(thread_id_t thread_id,
   // NOTE: We're locking the thread info's DRAM region last, to minimize the
   //       number of times we have to release three locks when bailing out due
   //       to errors.
-  if (test_and_set_dram_region_lock(thread_dram_region))  {
+
+  // NOTE: The thread metadata's DRAM region may be the same as the main
+  //       enclave's DRAM region, so we have to code around that.
+  if (thread_dram_region != dram_region &&
+      test_and_set_dram_region_lock(thread_dram_region))  {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
     return monitor_concurrent_call;
@@ -340,17 +351,82 @@ api_result_t create_enclave_thread(thread_id_t thread_id,
   phys_ptr<thread_private_info_t> private_thread{phys_addr};
   slot->*(&thread_slot_t::thread_info) = private_thread;
 
-  clear_dram_region_lock(thread_dram_region);
+  if (thread_dram_region != dram_region)
+    clear_dram_region_lock(thread_dram_region);
   atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
   clear_dram_region_lock(dram_region);
   return monitor_ok;
 }
 
 api_result_t delete_enclave_thread(thread_id_t thread_id) {
+  enclave_id_t enclave_id = current_enclave();
+  size_t dram_region = dram_region_for(enclave_id);
+  if (test_and_set_dram_region_lock(dram_region))
+    return monitor_concurrent_call;
+
+  phys_ptr<thread_slot_t> slot{enclave_thread_slot(enclave_id, thread_id)};
+  if (atomic_flag_test_and_set(&(slot->*(&thread_slot_t::lock)))) {
+    clear_dram_region_lock(dram_region);
+    return monitor_concurrent_call;
+  }
+
+  phys_ptr<thread_private_info_t> thread =
+      slot->*(&thread_slot_t::thread_info);
+  if (thread == phys_ptr<thread_private_info_t>::null()) {
+    atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_state;
+  }
+
+  uintptr_t thread_addr = uintptr_t(thread);
+  size_t thread_dram_region = dram_region_for(thread_addr);
+
+  // NOTE: The thread metadata's DRAM region may be the same as the main
+  //       enclave's DRAM region, so we have to code around that.
+  if (thread_dram_region != dram_region &&
+      test_and_set_dram_region_lock(thread_dram_region))  {
+    atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
+    clear_dram_region_lock(dram_region);
+    return monitor_concurrent_call;
+  }
+
+  phys_ptr<dram_region_info_t> thread_region{
+      dram_region_start(thread_dram_region)};
+  thread_region->*(&dram_region_info_t::pinned_pages) -=
+      thread_private_info_pages();
+
+  slot->*(&thread_slot_t::thread_info) =
+      phys_ptr<thread_private_info_t>::null();
+
+  if (thread_dram_region != dram_region)
+    clear_dram_region_lock(thread_dram_region);
+  atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
+  clear_dram_region_lock(dram_region);
   return monitor_ok;
 }
 
 api_result_t exit_enclave() {
+  phys_ptr<core_info_t> core{current_core_info()};
+
+  enclave_id_t enclave_id = core->*(&core_info_t::enclave_id);
+  thread_id_t thread_id = core->*(&core_info_t::thread_id);
+  phys_ptr<thread_private_info_t> private_thread =
+      core->*(&core_info_t::thread);
+
+  phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  phys_ptr<thread_slot_t> slot{enclave_thread_slot(enclave_id, thread_id)};
+
+  core->*(&core_info_t::enclave_id) = null_enclave_id;
+  set_eptbr(0);
+  set_ev_base(0);
+  set_ev_mask(0);
+
+  atomic_fetch_sub(&(enclave_info->*(&enclave_info_t::running_threads)),
+      static_cast<size_t>(1));
+  atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
+
+  // TODO: modify return state to return to the run_enclave_thread() caller
+
   return monitor_ok;
 }
 

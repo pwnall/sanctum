@@ -91,6 +91,12 @@ TEST(PhysPtrTest, HandlesUintptr) {
   ASSERT_EQ(value + write_value, *ptr_addr);
   *ptr_addr = value;
 
+  *ptr_addr -= write_value;
+  ASSERT_EQ(value - write_value,
+            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+  ASSERT_EQ(value - write_value, *ptr_addr);
+  *ptr_addr = value;
+
   static_assert(value != (value | write_value), "Invalid test setup.");
   *ptr_addr |= write_value;
   ASSERT_EQ(value | write_value,
@@ -188,21 +194,27 @@ TEST(PhysPtrTest, HandlesSize) {
 
   *ptr_addr += write_value;
   ASSERT_EQ(value + write_value,
-            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<size_t*>(phys_buffer + addr)));
   ASSERT_EQ(value + write_value, *ptr_addr);
+  *ptr_addr = value;
+
+  *ptr_addr -= write_value;
+  ASSERT_EQ(value - write_value,
+            *(reinterpret_cast<size_t*>(phys_buffer + addr)));
+  ASSERT_EQ(value - write_value, *ptr_addr);
   *ptr_addr = value;
 
   static_assert(value != (value | write_value), "Invalid test setup.");
   *ptr_addr |= write_value;
   ASSERT_EQ(value | write_value,
-            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<size_t*>(phys_buffer + addr)));
   ASSERT_EQ(value | write_value, *ptr_addr);
   *ptr_addr = value;
 
   static_assert(value != (value & write_value), "Invalid test setup.");
   *ptr_addr &= write_value;
   ASSERT_EQ(value & write_value,
-            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<size_t*>(phys_buffer + addr)));
   ASSERT_EQ(value & write_value, *ptr_addr);
   *ptr_addr = value;
 
@@ -293,6 +305,12 @@ TEST(PhysPtrTest, HandlesPhysPtrOfSize) {
   ASSERT_EQ(value + offset,
             *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
   ASSERT_EQ(value + offset, phys_ptr<size_t>(*ptr_addr));
+  *ptr_addr = value;
+
+  *ptr_addr -= offset;
+  ASSERT_EQ(value - offset,
+            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+  ASSERT_EQ(value - offset, phys_ptr<size_t>(*ptr_addr));
   *ptr_addr = value;
 
   ASSERT_EQ(0, uintptr_t{phys_ptr<phys_ptr<size_t>*>::null()});

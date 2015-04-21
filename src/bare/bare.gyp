@@ -64,7 +64,6 @@
         'arch/test/cpu_context_arch.h',
         'arch/test/memory_arch.cc',
         'arch/test/memory_arch.h',
-        'arch/test/page_tables_arch.cc',
         'arch/test/page_tables_arch.h',
         'arch/test/phys_atomics_arch.h',
         'arch/test/phys_ptr_arch.cc',

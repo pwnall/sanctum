@@ -43,6 +43,12 @@ template<> inline uintptr_t atomic_fetch_add(
   object->*(&atomic<uintptr_t>::__value) += value;
   return old_value;
 }
+template<> inline uintptr_t atomic_fetch_sub(
+    phys_ptr<atomic<uintptr_t>> object, uintptr_t value) noexcept {
+  uintptr_t old_value = object->*(&atomic<uintptr_t>::__value);
+  object->*(&atomic<uintptr_t>::__value) -= value;
+  return old_value;
+}
 
 };  // namespace sanctum::bare
 };  // namespace sanctum

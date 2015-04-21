@@ -385,7 +385,11 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
   // NOTE: We're locking the thread info's DRAM region last, to minimize the
   //       number of times we have to release three locks when bailing out due
   //       to errors.
-  if (test_and_set_dram_region_lock(thread_dram_region))  {
+
+  // NOTE: The thread metadata's DRAM region may be the same as the main
+  //       enclave's DRAM region, so we have to code around that.
+  if (thread_dram_region != dram_region &&
+      test_and_set_dram_region_lock(thread_dram_region))  {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
     return monitor_concurrent_call;
@@ -405,7 +409,8 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
   phys_ptr<thread_info_t> thread{phys_addr};
   thread->*(&thread_info_t::eptbr) = ptb;
 
-  clear_dram_region_lock(thread_dram_region);
+  if (thread_dram_region != dram_region)
+    clear_dram_region_lock(thread_dram_region);
   atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
   clear_dram_region_lock(dram_region);
   return monitor_ok;

@@ -5,13 +5,6 @@
 #include "../../phys_ptr.h"
 
 namespace sanctum {
-namespace testing {
-
-// For testing, the page table root registers are virtualized.
-extern uintptr_t core_ptbr[], core_eptbr[];
-
-};  // namespace sanctum::testing
-
 namespace bare {
 
 static_assert(sizeof(uintptr_t) >= 8, "Sanctum tests require 64-bit pointers");
@@ -40,13 +33,6 @@ constexpr inline size_t page_table_entry_shift(size_t level) {
 
   // L1 has 16-byte entries (4 pages/table), L2 has
   return (level == 0) ? 4 : ((level == 1) ? 3 : 5);
-}
-
-inline void set_eptbr(uintptr_t value) {
-  testing::core_eptbr[current_core()] = value;
-}
-inline void set_ptbr(uintptr_t value) {
-  testing::core_ptbr[current_core()] = value;
 }
 
 inline bool is_valid_page_table_entry(uintptr_t entry_addr, size_t level) {

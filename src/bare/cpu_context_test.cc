@@ -7,6 +7,10 @@ using sanctum::bare::flush_tlbs;
 using sanctum::bare::flush_private_caches;
 using sanctum::bare::read_core_count;
 using sanctum::bare::set_cache_index_shift;
+using sanctum::bare::set_eptbr;
+using sanctum::bare::set_ev_base;
+using sanctum::bare::set_ev_mask;
+using sanctum::bare::set_ptbr;
 using sanctum::testing::set_current_core;
 using sanctum::testing::set_core_count;
 
@@ -104,3 +108,78 @@ TEST(CpuContextTest, VirtualCacheIndexShift) {
   ASSERT_EQ(10, sanctum::testing::core_cache_index_shift[3]);
 }
 
+TEST(CpuContextTest, VirtualPtbr) {
+  uintptr_t value = 0xcafe;
+
+  set_core_count(8);
+
+  set_ptbr(value);
+  ASSERT_EQ(value, sanctum::testing::core_ptbr[0]);
+  ASSERT_EQ(0, sanctum::testing::core_ptbr[3]);
+  set_ptbr(0);
+  ASSERT_EQ(0, sanctum::testing::core_ptbr[0]);
+  set_current_core(3);
+  set_ptbr(value);
+  ASSERT_EQ(0, sanctum::testing::core_ptbr[0]);
+  ASSERT_EQ(value, sanctum::testing::core_ptbr[3]);
+  set_ptbr(0);
+  ASSERT_EQ(0, sanctum::testing::core_ptbr[3]);
+  set_current_core(0);
+}
+
+TEST(CpuContextTest, VirtualEptbr) {
+  uintptr_t value = 0xcafe;
+
+  set_core_count(8);
+
+  set_eptbr(value);
+  ASSERT_EQ(value, sanctum::testing::core_eptbr[0]);
+  ASSERT_EQ(0, sanctum::testing::core_eptbr[3]);
+  set_eptbr(0);
+  ASSERT_EQ(0, sanctum::testing::core_eptbr[0]);
+  set_current_core(3);
+  set_eptbr(value);
+  ASSERT_EQ(0, sanctum::testing::core_eptbr[0]);
+  ASSERT_EQ(value, sanctum::testing::core_eptbr[3]);
+  set_eptbr(0);
+  ASSERT_EQ(0, sanctum::testing::core_eptbr[3]);
+  set_current_core(0);
+}
+
+TEST(CpuContextTest, VirtualEvBase) {
+  uintptr_t value = 0x20000000;
+
+  set_core_count(8);
+
+  set_ev_base(value);
+  ASSERT_EQ(value, sanctum::testing::core_ev_base[0]);
+  ASSERT_EQ(0, sanctum::testing::core_ev_base[3]);
+  set_ev_base(0);
+  ASSERT_EQ(0, sanctum::testing::core_ev_base[0]);
+  set_current_core(3);
+  set_ev_base(value);
+  ASSERT_EQ(0, sanctum::testing::core_ev_base[0]);
+  ASSERT_EQ(value, sanctum::testing::core_ev_base[3]);
+  set_ev_base(0);
+  ASSERT_EQ(0, sanctum::testing::core_ev_base[3]);
+  set_current_core(0);
+}
+
+TEST(CpuContextTest, VirtualEvMask) {
+  uintptr_t value = 0x1fffffff;
+
+  set_core_count(8);
+
+  set_ev_mask(value);
+  ASSERT_EQ(value, sanctum::testing::core_ev_mask[0]);
+  ASSERT_EQ(0, sanctum::testing::core_ev_mask[3]);
+  set_ev_mask(0);
+  ASSERT_EQ(0, sanctum::testing::core_ev_mask[0]);
+  set_current_core(3);
+  set_ev_mask(value);
+  ASSERT_EQ(0, sanctum::testing::core_ev_mask[0]);
+  ASSERT_EQ(value, sanctum::testing::core_ev_mask[3]);
+  set_ev_mask(0);
+  ASSERT_EQ(0, sanctum::testing::core_ev_mask[3]);
+  set_current_core(0);
+}

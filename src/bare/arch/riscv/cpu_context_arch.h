@@ -21,6 +21,19 @@ inline void flush_private_caches() {
 inline void set_cache_index_shift(size_t cache_index_shift) {
   // TODO: asm intrinsic
 }
+inline void set_eptbr(uintptr_t value) {
+  // TODO: asm intrinsic
+}
+inline void set_ptbr(uintptr_t value) {
+  // TODO: asm intrinsic
+}
+inline void set_ev_base(uintptr_t value) {
+  // TODO: asm intrinsic
+}
+inline void set_ev_mask(uintptr_t value) {
+  // TODO: asm intrinsic
+}
+
 struct enclave_exit_state_t {
   // TODO: RISC V register state
 };

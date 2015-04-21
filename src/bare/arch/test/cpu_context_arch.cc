@@ -13,6 +13,10 @@ size_t current_core = 0;
 size_t core_tlb_flush_count[max_cores];
 size_t core_cache_flush_count[max_cores];
 size_t core_cache_index_shift[max_cores];
+uintptr_t core_ptbr[max_cores];
+uintptr_t core_eptbr[max_cores];
+uintptr_t core_ev_base[max_cores];
+uintptr_t core_ev_mask[max_cores];
 
 void set_current_core(size_t core_id) {
   assert(core_id < core_count);

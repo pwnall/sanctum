@@ -26,6 +26,8 @@ template<typename T>
     void atomic_store(phys_ptr<atomic<T>> object, T value) noexcept;
 template<typename T>
     T atomic_fetch_add(phys_ptr<atomic<T>> object, T value) noexcept;
+template<typename T>
+    T atomic_fetch_sub(phys_ptr<atomic<T>> object, T value) noexcept;
 
 
 };  // namespace sanctum::bare

@@ -14,8 +14,6 @@ using sanctum::bare::page_table_pages;
 using sanctum::bare::page_table_shift;
 using sanctum::bare::page_table_size;
 using sanctum::bare::page_table_translated_bits;
-using sanctum::bare::set_eptbr;
-using sanctum::bare::set_ptbr;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 using sanctum::bare::write_page_table_entry;
@@ -54,44 +52,6 @@ TEST(PageTablesTest, Geometry) {
 
   static_assert(page_table_translated_bits() == 46,
       "page_table_translated_bits");
-}
-
-TEST(PageTablesTest, VirtualPtbr) {
-  uintptr_t value = 0xcafe;
-
-  set_core_count(8);
-
-  set_ptbr(value);
-  ASSERT_EQ(value, sanctum::testing::core_ptbr[0]);
-  ASSERT_EQ(0, sanctum::testing::core_ptbr[3]);
-  set_ptbr(0);
-  ASSERT_EQ(0, sanctum::testing::core_ptbr[0]);
-  set_current_core(3);
-  set_ptbr(value);
-  ASSERT_EQ(0, sanctum::testing::core_ptbr[0]);
-  ASSERT_EQ(value, sanctum::testing::core_ptbr[3]);
-  set_ptbr(0);
-  ASSERT_EQ(0, sanctum::testing::core_ptbr[3]);
-  set_current_core(0);
-}
-
-TEST(PageTablesTest, VirtualEptbr) {
-  uintptr_t value = 0xcafe;
-
-  set_core_count(8);
-
-  set_eptbr(value);
-  ASSERT_EQ(value, sanctum::testing::core_eptbr[0]);
-  ASSERT_EQ(0, sanctum::testing::core_eptbr[3]);
-  set_eptbr(0);
-  ASSERT_EQ(0, sanctum::testing::core_eptbr[0]);
-  set_current_core(3);
-  set_eptbr(value);
-  ASSERT_EQ(0, sanctum::testing::core_eptbr[0]);
-  ASSERT_EQ(value, sanctum::testing::core_eptbr[3]);
-  set_eptbr(0);
-  ASSERT_EQ(0, sanctum::testing::core_eptbr[3]);
-  set_current_core(0);
 }
 
 TEST(PageTablesTest, IsValidPageTableEntry) {

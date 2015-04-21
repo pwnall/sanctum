@@ -89,6 +89,26 @@ TEST(AtomicTest, HandlesUintptr) {
       (reinterpret_cast<atomic<uintptr_t>*>(phys_buffer + addr))->__value);
   ASSERT_EQ(write_value + value, atomic_load(ptr));
 
+  ASSERT_EQ(write_value + value, atomic_fetch_add(ptr, value));
+  ASSERT_EQ(write_value + 2 * value,
+      (reinterpret_cast<atomic<uintptr_t>*>(phys_buffer + addr))->__value);
+  ASSERT_EQ(write_value + 2 * value, atomic_load(ptr));
+
+  atomic_store(ptr, write_value);
+  ASSERT_EQ(write_value,
+      (reinterpret_cast<atomic<uintptr_t>*>(phys_buffer + addr))->__value);
+  ASSERT_EQ(write_value, atomic_load(ptr));
+
+  ASSERT_EQ(write_value, atomic_fetch_sub(ptr, value));
+  ASSERT_EQ(write_value - value,
+      (reinterpret_cast<atomic<uintptr_t>*>(phys_buffer + addr))->__value);
+  ASSERT_EQ(write_value - value, atomic_load(ptr));
+
+  ASSERT_EQ(write_value - value, atomic_fetch_sub(ptr, value));
+  ASSERT_EQ(write_value - 2 * value,
+      (reinterpret_cast<atomic<uintptr_t>*>(phys_buffer + addr))->__value);
+  ASSERT_EQ(write_value - 2 * value, atomic_load(ptr));
+
   (reinterpret_cast<atomic<uintptr_t>*>(phys_buffer + addr))->__value = 0;
 }
 
@@ -112,6 +132,26 @@ TEST(AtomicTest, HandlesSize) {
   ASSERT_EQ(write_value + value,
       (reinterpret_cast<atomic<size_t>*>(phys_buffer + addr))->__value);
   ASSERT_EQ(write_value + value, atomic_load(ptr));
+
+  ASSERT_EQ(write_value + value, atomic_fetch_add(ptr, value));
+  ASSERT_EQ(write_value + 2 * value,
+      (reinterpret_cast<atomic<size_t>*>(phys_buffer + addr))->__value);
+  ASSERT_EQ(write_value + 2 * value, atomic_load(ptr));
+
+  atomic_store(ptr, write_value);
+  ASSERT_EQ(write_value,
+      (reinterpret_cast<atomic<size_t>*>(phys_buffer + addr))->__value);
+  ASSERT_EQ(write_value, atomic_load(ptr));
+
+  ASSERT_EQ(write_value, atomic_fetch_sub(ptr, value));
+  ASSERT_EQ(write_value - value,
+      (reinterpret_cast<atomic<size_t>*>(phys_buffer + addr))->__value);
+  ASSERT_EQ(write_value - value, atomic_load(ptr));
+
+  ASSERT_EQ(write_value - value, atomic_fetch_sub(ptr, value));
+  ASSERT_EQ(write_value - 2 * value,
+      (reinterpret_cast<atomic<size_t>*>(phys_buffer + addr))->__value);
+  ASSERT_EQ(write_value - 2 * value, atomic_load(ptr));
 
   (reinterpret_cast<atomic<size_t>*>(phys_buffer + addr))->__value = 0;
 }

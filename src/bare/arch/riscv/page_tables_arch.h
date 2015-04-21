@@ -20,13 +20,6 @@ constexpr inline size_t page_table_entry_shift(size_t level) {
   return 3;  // 8 bytes per page table entry
 }
 
-inline void set_eptbr(uintptr_t value) {
-  // TODO: asm intrinsic
-}
-inline void set_ptbr(uintptr_t value) {
-  // TODO: asm intrinsic
-}
-
 inline bool is_valid_page_table_entry(uintptr_t entry_addr, size_t level) {
   return *(phys_ptr<uintptr_t>{entry_addr}) & 1;
 }

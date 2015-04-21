@@ -30,7 +30,31 @@ void flush_private_caches();
 //
 // This must be set to identical values on all cores. Undefined behavior will
 // occur otherwise.
+//
+// This can only be issued by the security monitor.
 void set_cache_index_shift(size_t cache_index_shift);
+
+// Sets the EPTBR (enclave page table base register).
+//
+// This can only be issued by the security monitor. An invalid DRAM address
+// will lock up or reboot the machine.
+void set_eptbr(uintptr_t value);
+
+// Sets the PTBR (page table base register).
+//
+// This can only be issued by the security monitor. An invalid DRAM address
+// will lock up or reboot the machine.
+void set_ptbr(uintptr_t value);
+
+// Sets the EV_BASE (enclave virtual address base register).
+//
+// This can only be issued by the security monitor.
+void set_ev_base(uintptr_t value);
+
+// Sets the EV_MASK (enclave virtual address mask register).
+//
+// This can only be issued by the security monitor.
+void set_ev_mask(uintptr_t value);
 
 // The execution state saved by an asynchronous enclave exit.
 struct enclave_exit_state_t;

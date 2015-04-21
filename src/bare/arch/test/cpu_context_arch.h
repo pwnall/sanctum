@@ -17,6 +17,9 @@ extern size_t core_tlb_flush_count[], core_cache_flush_count[];
 // For testing, the cache index shift register is virtualized.
 extern size_t core_cache_index_shift[];
 
+// For testing, the page table root registers are virtualized.
+extern uintptr_t core_ptbr[], core_eptbr[], core_ev_base[], core_ev_mask[];
+
 // Sets the return value of current_core().
 void set_current_core(size_t core_id);
 
@@ -42,6 +45,18 @@ inline void flush_private_caches() {
 }
 inline void set_cache_index_shift(size_t cache_index_shift) {
   testing::core_cache_index_shift[current_core()] = cache_index_shift;
+}
+inline void set_eptbr(uintptr_t value) {
+  testing::core_eptbr[current_core()] = value;
+}
+inline void set_ptbr(uintptr_t value) {
+  testing::core_ptbr[current_core()] = value;
+}
+inline void set_ev_base(uintptr_t value) {
+  testing::core_ev_base[current_core()] = value;
+}
+inline void set_ev_mask(uintptr_t value) {
+  testing::core_ev_mask[current_core()] = value;
 }
 
 struct enclave_exit_state_t {

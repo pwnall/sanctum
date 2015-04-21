@@ -29,18 +29,6 @@ constexpr inline size_t page_table_shift(size_t level);
 // generally log2(sizeof(uintptr_t)).
 constexpr inline size_t page_table_entry_shift(size_t level);
 
-// Sets the EPTBR (enclave page table base register).
-//
-// This can only be issued by the security monitor. An invalid DRAM address
-// will lock up or reboot the machine.
-void set_eptbr(uintptr_t value);
-
-// Sets the PTBR (page table base register).
-//
-// This can only be issued by the security monitor. An invalid DRAM address
-// will lock up or reboot the machine.
-void set_ptbr(uintptr_t value);
-
 // Reads the valid (a.k.a. present) bit in a page table entry.
 //
 // Page entries with the valid bit unset have no other valid fields.

@@ -72,6 +72,10 @@ public:
     this->operator =(this->operator T() + other);
     return *this;
   }
+  template<typename U> inline phys_ref<T>& operator -=(const U& other) {
+    this->operator =(this->operator T() - other);
+    return *this;
+  }
   template<typename U> inline phys_ref<T>& operator |=(const U& other) {
     this->operator =(this->operator T() | other);
     return *this;
@@ -278,6 +282,11 @@ public:
   template<typename U> inline phys_ref<phys_ptr<T>>& operator +=(
       const U& other) {
     this->operator =(this->operator phys_ptr<T>() + other);
+    return *this;
+  }
+  template<typename U> inline phys_ref<phys_ptr<T>>& operator -=(
+      const U& other) {
+    this->operator =(this->operator phys_ptr<T>() - other);
     return *this;
   }
 
