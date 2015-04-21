@@ -306,8 +306,7 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
   }
 
   // The address of the last byte of the private_thread_info_t structure.
-  uintptr_t virtual_end = reinterpret_cast<uintptr_t>(
-      (reinterpret_cast<thread_private_info_t*>(virtual_addr)) + 1);
+  uintptr_t virtual_end = virtual_addr + thread_private_info_size();
 
   // NOTE: the enclave virtual address range is continunous, so we can get away
   //       with checking the start and end address for inclusion
@@ -320,7 +319,7 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
   uintptr_t ptb = enclave_info->*(&enclave_info_t::loading_eptbr);
   phys_ptr<size_t> region_bitmap = enclave_region_bitmap(enclave_id);
   uintptr_t phys_addr = walk_page_tables(ptb, virtual_addr);
-  uintptr_t phys_end = virtual_addr + thread_private_info_size();
+  uintptr_t phys_end = phys_addr + thread_private_info_size();
 
   // NOTE: The thread_private_info_t occupies contiguous space in physical
   //       memory, so we only need to check the end for DRAM inclusion. The
@@ -331,14 +330,11 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
     return monitor_invalid_value;
   }
 
-  // NOTE: we're subtracting page_size() so the contiguous range check in the
-  //       loop passes for the first page
-  uintptr_t last_phys_addr = phys_addr - page_size();
-  // NOTE: we're bailing
+  uintptr_t last_phys_addr = phys_addr;
   size_t thread_dram_region = dram_region_for(phys_addr);
   bool is_supported_mapping = true;
-  for (uintptr_t page_addr = virtual_addr; page_addr < virtual_end;
-       page_addr += page_size()) {
+  for (uintptr_t page_addr = virtual_addr + page_size();
+       page_addr < virtual_end; page_addr += page_size()) {
     uintptr_t next_phys_addr = walk_page_tables(ptb, page_addr);
     if (next_phys_addr != last_phys_addr + page_size()) {
       // Virtual pages don't map to contiguous physical pages.
@@ -347,7 +343,7 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
     }
     last_phys_addr = next_phys_addr;
 
-    if (dram_region_for(page_addr) != thread_dram_region) {
+    if (dram_region_for(next_phys_addr) != thread_dram_region) {
       // Virtual pages map to physical pages in different DRAM regions. We
       // don't support that, because the code would be quite complex. We'd have
       // to acquire locks for multiple DRAM regions, and release them carefully
@@ -389,7 +385,7 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
   // NOTE: We're locking the thread info's DRAM region last, to minimize the
   //       number of times we have to release three locks when bailing out due
   //       to errors.
-  if (test_and_set_dram_region_lock(dram_region))  {
+  if (test_and_set_dram_region_lock(thread_dram_region))  {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
     return monitor_concurrent_call;
@@ -409,12 +405,34 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
   phys_ptr<thread_info_t> thread{phys_addr};
   thread->*(&thread_info_t::eptbr) = ptb;
 
+  clear_dram_region_lock(thread_dram_region);
   atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
   clear_dram_region_lock(dram_region);
   return monitor_ok;
 }
 
 api_result_t init_enclave(enclave_id_t enclave_id) {
+  size_t dram_region = clamped_dram_region_for(enclave_id);
+  if (test_and_set_dram_region_lock(dram_region))
+    return monitor_concurrent_call;
+
+  // NOTE: null_enclave_id is accepted by is_valid_enclave_id, but does not
+  //       have a useful meaning here
+  if (enclave_id == null_enclave_id || !is_valid_enclave_id(enclave_id)) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_value;
+  }
+
+  phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  if (enclave_info->*(&enclave_info_t::is_initialized) != 0) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_state;
+  }
+
+  // TODO: finalize measurement hash
+
+  enclave_info->*(&enclave_info_t::is_initialized) = 1;
+  clear_dram_region_lock(dram_region);
   return monitor_ok;
 }
 

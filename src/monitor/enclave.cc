@@ -28,8 +28,10 @@ using sanctum::internal::clamped_dram_region_for;
 using sanctum::internal::clear_dram_region_lock;
 using sanctum::internal::core_info_t;
 using sanctum::internal::current_core_info;
+using sanctum::internal::current_enclave;
 using sanctum::internal::dram_region_for;
 using sanctum::internal::dram_region_info_t;
+using sanctum::internal::dram_region_start;
 using sanctum::internal::enclave_info_t;
 using sanctum::internal::enclave_region_bitmap;
 using sanctum::internal::enclave_thread_slot;
@@ -43,6 +45,7 @@ using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::read_enclave_region_bitmap_bit;
 using sanctum::internal::test_and_set_dram_region_lock;
 using sanctum::internal::thread_private_info_pages;
+using sanctum::internal::thread_private_info_size;
 using sanctum::internal::thread_private_info_t;
 using sanctum::internal::thread_slot_t;
 
@@ -273,6 +276,73 @@ namespace enclave {  // sanctum::api::enclave
 
 api_result_t create_enclave_thread(thread_id_t thread_id,
     uintptr_t phys_addr) {
+  if (!is_page_aligned(phys_addr))
+    return monitor_invalid_value;
+  if (!is_dram_address(phys_addr))
+    return monitor_invalid_value;
+
+  uintptr_t phys_end = phys_addr + thread_private_info_size();
+  // NOTE: The thread_private_info_t occupies contiguous space in physical
+  //       memory, so we only need to check the end for DRAM inclusion. The
+  //       intermediate pages are guaranteed to be in DRAM.
+  if (!is_dram_address(phys_end - 1))
+    return monitor_invalid_value;
+
+  enclave_id_t enclave_id = current_enclave();
+  size_t dram_region = dram_region_for(enclave_id);
+  if (test_and_set_dram_region_lock(dram_region))
+    return monitor_concurrent_call;
+
+  phys_ptr<size_t> region_bitmap = enclave_region_bitmap(enclave_id);
+  size_t thread_dram_region = dram_region_for(phys_addr);
+  for (uintptr_t page_addr = phys_addr + page_size();
+       page_addr < phys_end; page_addr += page_size()) {
+    if (dram_region_for(page_addr) != thread_dram_region) {
+      // See load_enclave_thread() for the reasons why we don't support thread
+      // metadata spanning multiple DRAM regions.
+      clear_dram_region_lock(dram_region);
+      return monitor_unsupported;
+    }
+  }
+
+  // NOTE: We're performing the thread slot checks towards the end to minimize
+  //       the number of times we have two release two/three locks when bailing
+  //       out due to errors.
+
+  phys_ptr<thread_slot_t> slot{enclave_thread_slot(enclave_id, thread_id)};
+  if (atomic_flag_test_and_set(&(slot->*(&thread_slot_t::lock)))) {
+    clear_dram_region_lock(dram_region);
+    return monitor_concurrent_call;
+  }
+
+  phys_ptr<thread_private_info_t> old_thread =
+      slot->*(&thread_slot_t::thread_info);
+  if (old_thread != phys_ptr<thread_private_info_t>::null()) {
+    atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_state;
+  }
+
+  // NOTE: We're locking the thread info's DRAM region last, to minimize the
+  //       number of times we have to release three locks when bailing out due
+  //       to errors.
+  if (test_and_set_dram_region_lock(thread_dram_region))  {
+    atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
+    clear_dram_region_lock(dram_region);
+    return monitor_concurrent_call;
+  }
+
+  phys_ptr<dram_region_info_t> thread_region{
+      dram_region_start(thread_dram_region)};
+  thread_region->*(&dram_region_info_t::pinned_pages) +=
+      thread_private_info_pages();
+
+  phys_ptr<thread_private_info_t> private_thread{phys_addr};
+  slot->*(&thread_slot_t::thread_info) = private_thread;
+
+  clear_dram_region_lock(thread_dram_region);
+  atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
+  clear_dram_region_lock(dram_region);
   return monitor_ok;
 }
 

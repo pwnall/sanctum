@@ -171,6 +171,9 @@ typedef enum {
 dram_region_state_t dram_region_state(size_t dram_region);
 
 // The owner of the DRAM region with the given index.
+//
+// Returns null_enclave_id if the given DRAM region index is invalid, or if the
+// region is not in the owned state.
 enclave_id_t dram_region_owner(size_t dram_region);
 
 // Assigns a free DRAM region to an enclave or to the OS.
@@ -248,10 +251,12 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
 // `thread_id` must be smaller than the enclave's maximum thread count, and
 // must not be used by another hardware thread.
 //
-// `virtual_addr` must point to virtual memory that was previously initialized
-// by calling load_enclave_page(). The virtual memory must point to a
-// contiguous range of physical memory pages long enough to hold a thread_info
-// structure.
+// `virtual_addr` must point to thread_info_pages() pages of virtual memory
+// that was previously initialized by calling load_enclave_page().
+//
+// The virtual memory buffer pointed by `virtual_addr` must map to a contiguous
+// range of physical memory pages that belong to the same DRAM region,
+// otherwise the API call will return monitor_unsupported.
 api_result_t load_enclave_thread(enclave_id_t enclave_id,
     thread_id_t thread_id, uintptr_t virtual_addr);
 
