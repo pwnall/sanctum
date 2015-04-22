@@ -8,7 +8,12 @@
 // Per-architecture basic type definitions.
 #include "base_types_arch.h"
 
+namespace sanctum {
+namespace bare {  // sanctum::bare
+
 static_assert(sizeof(uintptr_t) >= sizeof(void *), "uintptr_t too small");
 static_assert(sizeof(uint32_t) == 4, "uint32_t is not exactly 4 bytes");
 
+};  // namespace sanctum::bare
+};  // namespace sanctum
 #endif  // !definded(BARE_BASE_TYPES_H_INCLUDED)

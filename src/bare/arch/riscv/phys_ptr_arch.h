@@ -19,7 +19,7 @@ template<> inline phys_ref<uint32_t>::operator uint32_t() const {
   return 0;
 }
 template<> inline phys_ref<uint32_t>& phys_ref<uint32_t>::
-    operator =(const size_t& value) {
+    operator =(const uint32_t& value) {
   // TODO: asm intrinsic
   return *this;
 }

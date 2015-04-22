@@ -41,6 +41,7 @@
       'direct_dependent_settings': {
         'include_dirs': [
           '..',
+          'arch/riscv',
         ],
       },
       'all_dependent_settings': {

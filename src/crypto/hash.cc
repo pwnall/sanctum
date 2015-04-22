@@ -8,6 +8,7 @@ using sanctum::bare::bzero;
 using sanctum::bare::phys_ptr;
 using sanctum::bare::size_t;
 using sanctum::bare::uint32_t;
+using sanctum::bare::uintptr_t;
 
 namespace {
 

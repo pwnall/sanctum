@@ -39,6 +39,10 @@
           '..',
         ],
       },
+      'dependencies': [
+        '../bare/bare.gyp:bare',
+        '../crypto/crypto.gyp:crypto',
+      ],
     },
     {
       # Unit tests for the monitor.
@@ -49,6 +53,7 @@
       ],
       'dependencies': [
         '../bare/bare.gyp:bare_testing',
+        '../crypto/crypto.gyp:crypto_testing',
         '../deps/gtest.gyp:gtest',
         '../deps/libcxx.gyp:libc++',
       ],

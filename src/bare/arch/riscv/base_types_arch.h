@@ -4,9 +4,9 @@
 namespace sanctum {
 namespace bare {
 
-using size_t      = unsigned;
-using uintptr_t   = unsigned;
-using uint32_t    = unsigned;
+using size_t      = unsigned long long;
+using uintptr_t   = unsigned long long;
+using uint32_t    = unsigned int;
 
 };  // namespace sanctum::bare
 };  // namespace sanctum
