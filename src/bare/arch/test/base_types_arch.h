@@ -7,8 +7,9 @@
 namespace sanctum {
 namespace bare {
 
-typedef ::size_t     size_t;
-typedef ::uintptr_t  uintptr_t;
+using size_t      = ::size_t;
+using uintptr_t   = ::uintptr_t;
+using uint32_t    = ::uint32_t;
 
 };  // namespace sanctum::bare
 };  // namespace sanctum

@@ -31,6 +31,21 @@ template<> inline phys_ref<size_t>& phys_ref<size_t>::
   return *this;
 }
 
+template<> inline phys_ref<uint32_t>::operator uint32_t() const {
+  // NOTE: the assert would be prohibitively expensive in real code, but this
+  //       implementation is only used by unit tests
+  assert(addr + sizeof(uint32_t) <= testing::phys_buffer_size);
+  return *(reinterpret_cast<uint32_t *>(&testing::phys_buffer[addr]));
+}
+template<> inline phys_ref<uint32_t>& phys_ref<uint32_t>::
+    operator =(const uint32_t& value) {
+  // NOTE: the assert would be prohibitively expensive in real code, but this
+  //       implementation is only used by unit tests
+  assert(addr + sizeof(uint32_t) <= testing::phys_buffer_size);
+  *(reinterpret_cast<uint32_t *>(&testing::phys_buffer[addr])) = value;
+  return *this;
+}
+
 };  // namespace sanctum::bare
 };  // namespace sanctum
 #endif  // !definded(BARE_ARCH_TEST_PHYS_PTR_ARCH_H_INCLUDED)

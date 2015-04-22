@@ -11,6 +11,7 @@
       ],
       'dependencies': [
         'bare/bare.gyp:bare_tests',
+        'crypto/crypto.gyp:crypto_tests',
         'monitor/monitor.gyp:monitor_tests',
       ],
     },

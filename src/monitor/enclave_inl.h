@@ -38,7 +38,6 @@ inline phys_ptr<thread_slot_t> enclave_thread_slot(enclave_id_t enclave_id,
   return enclave_thread_slots(enclave_id) + thread_id;
 }
 
-
 // The amount of memory used by the security monitor for an enclave.
 //
 // The monitor data consists of an enclave_info_t, a DRAM region bitmap, and a
@@ -62,7 +61,6 @@ inline size_t enclave_monitor_area_pages(size_t max_threads) {
   return (enclave_monitor_area_size(max_threads) + page_size() - 1)
       >> page_shift();
 }
-
 
 // Sets a bit in a DRAM region bitmap.
 //

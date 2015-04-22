@@ -4,10 +4,9 @@
 namespace sanctum {
 namespace bare {
 
-// C11 types.
-
-typedef unsigned  size_t;
-typedef unsigned  uintptr_t;
+using size_t      = unsigned;
+using uintptr_t   = unsigned;
+using uint32_t    = unsigned;
 
 };  // namespace sanctum::bare
 };  // namespace sanctum

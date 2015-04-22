@@ -78,7 +78,8 @@ TEST(BitMaskingTest, AddressBitsFor) {
 TEST(BitMaskingTest, ReadSetBitmapBit) {
   constexpr uintptr_t addr = 160, addr2 = 200;
   constexpr uintptr_t zero_addr = 0;
-  memset(phys_buffer, 0, phys_buffer_size);
+  ASSERT_LE(256, phys_buffer_size);
+  memset(phys_buffer, 0, 256);
   *(reinterpret_cast<size_t*>(phys_buffer + addr)) = 0xFFFF;
 
   phys_ptr<size_t> ptr{addr};

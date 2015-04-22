@@ -221,6 +221,11 @@ public:  // Extensions for pointers to types with members.
     return phys_ref<U>{reinterpret_cast<uintptr_t>(
         &((reinterpret_cast<T*>(this->addr))->*(member_offset)))};
   }
+  template<typename U, size_t N> constexpr inline phys_ptr<U>
+      operator ->*(U (T::* member_offset)[N]) const noexcept {
+    return phys_ptr<U>{reinterpret_cast<uintptr_t>(
+        (reinterpret_cast<T*>(this->addr))->*(member_offset))};
+  }
 
   // NOTE: It's tempting to add a reference operator (commented out below).
   //       Unfortunately, -> must (ultimately) return a pointer type, so we

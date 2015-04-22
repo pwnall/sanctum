@@ -76,9 +76,7 @@ TEST(MemoryTest, ReadMaxCacheIndexShift) {
 }
 
 TEST(MemoryTest, Bzero) {
-  memset(phys_buffer, 0, phys_buffer_size);
   ASSERT_LE(256, phys_buffer_size);
-
   memset(phys_buffer, 0xcc, 256);
 
   phys_ptr<size_t> ptr{64};
@@ -115,9 +113,7 @@ TEST(MemoryTest, Bzero) {
 }
 
 TEST(MemoryTest, Bcopy) {
-  memset(phys_buffer, 0, phys_buffer_size);
   ASSERT_LE(256, phys_buffer_size);
-
   memset(phys_buffer, 0xcc, 128);
   memset(phys_buffer + 128, 0xdd, 128);
 

@@ -56,7 +56,8 @@ TEST(PageTablesTest, Geometry) {
 
 TEST(PageTablesTest, IsValidPageTableEntry) {
   uintptr_t addr = 160;
-  memset(phys_buffer, 0, phys_buffer_size);
+  ASSERT_LE(256, phys_buffer_size);
+  memset(phys_buffer, 0, 256);
 
   *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)) = 0;
   ASSERT_EQ(false, is_valid_page_table_entry(addr, 0));
@@ -79,7 +80,8 @@ TEST(PageTablesTest, IsValidPageTableEntry) {
 
 TEST(PageTablesTest, PageTableEntryTarget) {
   uintptr_t addr = 160;
-  memset(phys_buffer, 0, phys_buffer_size);
+  ASSERT_LE(256, phys_buffer_size);
+  memset(phys_buffer, 0, 256);
 
   *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)) = 0;
   ASSERT_EQ(0, page_table_entry_target(addr, 0));
@@ -106,7 +108,8 @@ TEST(PageTablesTest, PageTableEntryTarget) {
 
 TEST(PageTablesTest, WritePageTableEntry) {
   uintptr_t addr = 160;
-  memset(phys_buffer, 0, phys_buffer_size);
+  ASSERT_LE(256, phys_buffer_size);
+  memset(phys_buffer, 0, 256);
 
   write_page_table_entry(addr, 0, 0xcafebabe000, 0);
   ASSERT_EQ(0xcafebabe001,

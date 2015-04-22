@@ -13,7 +13,8 @@ using sanctum::testing::phys_buffer_size;
 
 TEST(AtomicFlagTest, TestAndSet) {
   uintptr_t addr1 = 160, addr2 = 200;
-  memset(phys_buffer, 0, phys_buffer_size);
+  ASSERT_LE(256, phys_buffer_size);
+  memset(phys_buffer, 0, 256);
   phys_ptr<atomic_flag> ptr1{addr1}, ptr2{addr2};
 
   ASSERT_EQ(false, atomic_flag_test_and_set(ptr1));
@@ -39,7 +40,8 @@ TEST(AtomicFlagTest, TestAndSet) {
 
 TEST(AtomicFlagTest, Clear) {
   uintptr_t addr1 = 160, addr2 = 200;
-  memset(phys_buffer, 0, phys_buffer_size);
+  ASSERT_LE(256, phys_buffer_size);
+  memset(phys_buffer, 0, 256);
   phys_ptr<atomic_flag> ptr1{addr1}, ptr2{addr2};
 
   atomic_flag_test_and_set(ptr1);
@@ -71,7 +73,8 @@ TEST(AtomicFlagTest, Clear) {
 TEST(AtomicTest, HandlesUintptr) {
   uintptr_t addr = 160;
   uintptr_t value = 0xbeef, write_value = 0xdeed;
-  memset(phys_buffer, 0, phys_buffer_size);
+  ASSERT_LE(256, phys_buffer_size);
+  memset(phys_buffer, 0, 256);
   phys_ptr<atomic<uintptr_t>> ptr{addr};
 
   atomic_init(ptr, value);
@@ -115,7 +118,8 @@ TEST(AtomicTest, HandlesUintptr) {
 TEST(AtomicTest, HandlesSize) {
   uintptr_t addr = 160;
   size_t value = 0xbeef, write_value = 0xdeed;
-  memset(phys_buffer, 0, phys_buffer_size);
+  ASSERT_LE(256, phys_buffer_size);
+  memset(phys_buffer, 0, 256);
   phys_ptr<atomic<size_t>> ptr{addr};
 
   atomic_init(ptr, value);
