@@ -1,11 +1,14 @@
 #include "hash.h"
 
 #include "bare/base_types.h"
+#include "bare/bit_masking.h"
 #include "bare/memory.h"
 
 using sanctum::bare::bcopy;
 using sanctum::bare::bzero;
+using sanctum::bare::is_big_endian;
 using sanctum::bare::phys_ptr;
+using sanctum::bare::reverse_bytes;
 using sanctum::bare::size_t;
 using sanctum::bare::uint32_t;
 using sanctum::bare::uintptr_t;
@@ -43,8 +46,7 @@ constexpr inline uint32_t clamp_to_32(uint32_t value) {
       (value & ((1 << 31) | ((1 << 31) - 1)));
 }
 constexpr inline uint32_t to_big_endian(uint32_t value) {
-  return ((value & 0xff) << 24) | ((value & 0xff00) << 8) |
-      ((value & 0xff0000) >> 8) | ((value & 0xff000000) >> 24);
+  return is_big_endian() ? value : reverse_bytes(value);
 }
 
 };  // anonymous namespace
@@ -62,14 +64,15 @@ void init_hash(phys_ptr<hash_state_t> state) {
   (state->*(&hash_state_t::h))[6] = 0x1f83d9ab;
   (state->*(&hash_state_t::h))[7] = 0x5be0cd19;
 
+  bzero(state->*(&hash_state_t::padding), hash_block_size);
+
   uintptr_t padding_addr = uintptr_t(state->*(&hash_state_t::padding));
   phys_ptr<uint32_t> padding_start{padding_addr};
-  bzero(padding_start, hash_block_size);
   *padding_start =
       to_big_endian((static_cast<uint32_t>(1) << (sizeof(uint32_t) * 8 - 1)));
 }
 
-void hash_block(phys_ptr<hash_state_t> state, phys_ptr<uint32_t> block) {
+void extend_hash(phys_ptr<hash_state_t> state, phys_ptr<uint32_t> block) {
   phys_ptr<uint32_t> hptr = state->*(&hash_state_t::h);
   uint32_t a = hptr[0];
   uint32_t b = hptr[1];
@@ -132,7 +135,7 @@ void hash_block(phys_ptr<hash_state_t> state, phys_ptr<uint32_t> block) {
 
 void finalize_hash(phys_ptr<hash_state_t> state) {
   uintptr_t padding_addr = uintptr_t(state->*(&hash_state_t::padding));
-  hash_block(state, phys_ptr<uint32_t>{padding_addr});
+  extend_hash(state, phys_ptr<uint32_t>{padding_addr});
 }
 
 };  // namespace sanctum::crypto

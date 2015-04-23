@@ -16,18 +16,21 @@ void init_phys_buffer(size_t buffer_size);
 
 namespace bare {
 
-template<> inline phys_ref<size_t>::operator size_t() const {
+// NOTE: specializing physptr_t for uint32_t and uint64_t is guaranteed to
+//       cover size_t and uintptr_t
+
+template<> inline phys_ref<uintptr_t>::operator uintptr_t() const {
   // NOTE: the assert would be prohibitively expensive in real code, but this
   //       implementation is only used by unit tests
-  assert(addr + sizeof(size_t) <= testing::phys_buffer_size);
-  return *(reinterpret_cast<size_t *>(&testing::phys_buffer[addr]));
+  assert(addr + sizeof(uintptr_t) <= testing::phys_buffer_size);
+  return *(reinterpret_cast<uintptr_t *>(&testing::phys_buffer[addr]));
 }
-template<> inline phys_ref<size_t>& phys_ref<size_t>::
-    operator =(const size_t& value) {
+template<> inline phys_ref<uintptr_t>& phys_ref<uintptr_t>::
+    operator =(const uintptr_t& value) {
   // NOTE: the assert would be prohibitively expensive in real code, but this
   //       implementation is only used by unit tests
-  assert(addr + sizeof(size_t) <= testing::phys_buffer_size);
-  *(reinterpret_cast<size_t *>(&testing::phys_buffer[addr])) = value;
+  assert(addr + sizeof(uintptr_t) <= testing::phys_buffer_size);
+  *(reinterpret_cast<uintptr_t *>(&testing::phys_buffer[addr])) = value;
   return *this;
 }
 

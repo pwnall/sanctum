@@ -4,8 +4,8 @@
 
 using sanctum::bare::phys_ptr;
 using sanctum::bare::uint32_t;
+using sanctum::crypto::extend_hash;
 using sanctum::crypto::finalize_hash;
-using sanctum::crypto::hash_block;
 using sanctum::crypto::hash_block_size;
 using sanctum::crypto::hash_state_t;
 using sanctum::crypto::init_hash;
@@ -42,7 +42,7 @@ TEST(HashTest, BlockOfA) {
   phys_ptr<hash_state_t> state{hash_addr};
   init_hash(state);
   phys_ptr<uint32_t> block{block_addr};
-  hash_block(state, block);
+  extend_hash(state, block);
   finalize_hash(state);
 
   phys_ptr<uint32_t> h = state->*(&hash_state_t::h);
@@ -68,7 +68,7 @@ TEST(HashTest, BlockOfLetters) {
   phys_ptr<hash_state_t> state{hash_addr};
   init_hash(state);
   phys_ptr<uint32_t> block{block_addr};
-  hash_block(state, block);
+  extend_hash(state, block);
   finalize_hash(state);
 
   phys_ptr<uint32_t> h = state->*(&hash_state_t::h);
@@ -93,7 +93,7 @@ TEST(HashTest, PageOfU) {
   init_hash(state);
   for (size_t i = 0; i < 4096; i += hash_block_size) {
     phys_ptr<uint32_t> block{block_addr + i};
-    hash_block(state, block);
+    extend_hash(state, block);
   }
   finalize_hash(state);
 

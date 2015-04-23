@@ -4,12 +4,12 @@
 namespace sanctum {
 namespace bare {
 
-template<> inline phys_ref<size_t>::operator size_t() const {
+template<> inline phys_ref<uintptr_t>::operator uintptr_t() const {
   // TODO: asm intrinsic
   return 0;
 }
-template<> inline phys_ref<size_t>& phys_ref<size_t>::
-    operator =(const size_t& value) {
+template<> inline phys_ref<uintptr_t>& phys_ref<uintptr_t>::
+    operator =(const uintptr_t& value) {
   // TODO: asm intrinsic
   return *this;
 }

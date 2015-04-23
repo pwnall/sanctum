@@ -77,6 +77,24 @@ inline bool read_bitmap_bit(phys_ptr<size_t> bitmap, size_t bit) {
   return (*(bitmap + offset) & mask) != 0;
 }
 
+// True if this is a big-endian architecture.
+constexpr bool is_big_endian();
+
+// Reverses the order of the bytes in the argument.
+//
+// This is used to convert between big-endian and little-endian values.
+//
+// The template is guaranteed to be specialized for uint32_t.
+template<typename T> constexpr T reverse_bytes(T value);
+template<> constexpr inline uint32_t reverse_bytes(uint32_t value) {
+  return ((value & 0xff) << 24) | ((value & 0xff00) << 8) |
+      ((value >> 24) & 0xff) | ((value >> 8) & 0xff00);
+}
+
 };  // namespace sanctum::bare
 };  // namespace sanctum
+
+// Architecture-dependent bit-masking definitions.
+#include "bit_masking_arch.h"
+
 #endif  // !defined(BARE_BIT_MASKING_H_INCLUDED)

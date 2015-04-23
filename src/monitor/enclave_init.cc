@@ -4,6 +4,7 @@
 #include "bare/page_tables.h"
 #include "dram_regions_inl.h"
 #include "enclave_inl.h"
+#include "measure_inl.h"
 
 using sanctum::bare::atomic_fetch_add;
 using sanctum::bare::bcopy;
@@ -30,9 +31,14 @@ using sanctum::internal::enclave_monitor_area_size;
 using sanctum::internal::enclave_region_bitmap;
 using sanctum::internal::enclave_thread_slot;
 using sanctum::internal::enclave_thread_slots;
+using sanctum::internal::extend_enclave_hash_with_page;
+using sanctum::internal::extend_enclave_hash_with_page_table;
+using sanctum::internal::extend_enclave_hash_with_thread;
+using sanctum::internal::finalize_enclave_hash;
 using sanctum::internal::free_enclave_id;
 using sanctum::internal::g_dram_region;
 using sanctum::internal::g_dram_region_shift;
+using sanctum::internal::init_enclave_hash;
 using sanctum::internal::is_dram_address;
 using sanctum::internal::is_enclave_monitor_address;
 using sanctum::internal::is_enclave_virtual_address;
@@ -98,7 +104,7 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
     enclave_info->*(&enclave_info_t::monitor_area_top) = enclave_id +
       (monitor_area_pages << page_shift());
 
-    // TODO: measure the operation
+    init_enclave_hash(enclave_info, ev_base, ev_mask, max_threads);
   } else {
     enclave_id = null_enclave_id;  // monitor_invalid_state
   }
@@ -188,7 +194,7 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
   enclave_info->*(&enclave_info_t::loading_last_addr) = phys_end - page_size();
   bzero(phys_ptr<size_t>{phys_addr}, table_size);
 
-  // TODO: measure the operation
+  extend_enclave_hash_with_page_table(enclave_info, virtual_addr, level, acl);
 
   clear_dram_region_lock(dram_region);
   return monitor_ok;
@@ -273,7 +279,7 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
   bcopy(phys_ptr<size_t>{phys_addr}, phys_ptr<size_t>{os_addr}, page_size());
   clear_dram_region_lock(os_dram_region);
 
-  // TODO: measure the operation
+  extend_enclave_hash_with_page(enclave_info, virtual_addr, acl, phys_addr);
 
   clear_dram_region_lock(dram_region);
   return monitor_ok;
@@ -411,6 +417,8 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
   phys_ptr<thread_info_t> thread{phys_addr};
   thread->*(&thread_info_t::eptbr) = ptb;
 
+  extend_enclave_hash_with_thread(enclave_info, thread_id, virtual_addr);
+
   if (thread_dram_region != dram_region)
     clear_dram_region_lock(thread_dram_region);
   atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
@@ -436,7 +444,7 @@ api_result_t init_enclave(enclave_id_t enclave_id) {
     return monitor_invalid_state;
   }
 
-  // TODO: finalize measurement hash
+  finalize_enclave_hash(enclave_info);
 
   enclave_info->*(&enclave_info_t::is_initialized) = 1;
   clear_dram_region_lock(dram_region);

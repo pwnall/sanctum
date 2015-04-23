@@ -22,6 +22,7 @@
       'sources': [
         '<@(bare_common_sources)',
         'arch/riscv/base_types_arch.h',
+        'arch/riscv/bit_masking_arch.h',
         'arch/riscv/cpu_context_arch.h',
         'arch/riscv/memory_arch.h',
         'arch/riscv/page_tables_arch.h',
@@ -61,6 +62,7 @@
       'type': '<(library)',
       'sources': [
         'arch/test/base_types_arch.h',
+        'arch/test/bit_masking_arch.h',
         'arch/test/cpu_context_arch.cc',
         'arch/test/cpu_context_arch.h',
         'arch/test/memory_arch.cc',

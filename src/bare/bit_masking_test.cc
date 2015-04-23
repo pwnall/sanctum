@@ -9,6 +9,7 @@ using sanctum::bare::is_valid_range;
 using sanctum::bare::is_valid_range_mask;
 using sanctum::bare::phys_ptr;
 using sanctum::bare::read_bitmap_bit;
+using sanctum::bare::reverse_bytes;
 using sanctum::bare::set_bitmap_bit;
 using sanctum::testing::phys_buffer;
 using sanctum::testing::phys_buffer_size;
@@ -73,6 +74,20 @@ TEST(BitMaskingTest, AddressBitsFor) {
   ASSERT_EQ(4, address_bits_for(9));
   ASSERT_EQ(4, address_bits_for(16));
   ASSERT_EQ(16, address_bits_for(65536));
+}
+
+TEST(BitMaskingTest, ReverseBytes) {
+  ASSERT_EQ(0xff000000U, reverse_bytes(0xffU));
+  ASSERT_EQ(0xff0000U, reverse_bytes(0xff00U));
+  ASSERT_EQ(0xff00U, reverse_bytes(0xff0000U));
+  ASSERT_EQ(0xffU, reverse_bytes(0xff000000U));
+  ASSERT_EQ(0U, reverse_bytes(0U));
+
+  ASSERT_EQ(0x12345678U, reverse_bytes(0x78563412U));
+  ASSERT_EQ(0x78563412U, reverse_bytes(0x12345678U));
+
+  ASSERT_EQ(0xfedcba98U, reverse_bytes(0x98badcfeU));
+  ASSERT_EQ(0x98badcfeu, reverse_bytes(0xfedcba98U));
 }
 
 TEST(BitMaskingTest, ReadSetBitmapBit) {

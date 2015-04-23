@@ -3,6 +3,7 @@
 
 #include "bare/base_types.h"
 #include "bare/phys_atomics.h"
+#include "crypto/hash.h"
 #include "public/api.h"
 
 namespace sanctum {
@@ -14,6 +15,8 @@ using sanctum::bare::atomic_flag;
 using sanctum::bare::phys_ptr;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
+using sanctum::crypto::hash_block_size;
+using sanctum::crypto::hash_state_t;
 
 // Extended version of thred_info_t.
 struct thread_private_info_t {
@@ -73,6 +76,15 @@ struct enclave_info_t {
   // This field is only incremented while the enclave lock is held. However, it
   // is decremented without holding the enclave lock, in enclave exits.
   atomic<size_t> running_threads;
+
+  // The enclave's measurement hash.
+  //
+  // This is updated by the enclave loading API calls, and finalized by
+  // enclave_init(). It does not change afterwards.
+  hash_state_t hash;
+
+  // Working area for the enclave measurement process.
+  uint32_t hash_block[hash_block_size / sizeof(uint32_t)];
 };
 
 // The DRAM region bitmap for the OS.
