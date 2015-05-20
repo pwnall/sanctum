@@ -49,6 +49,13 @@ typedef enum {
   // interest of reducing edge cases in monitor implementation.
   monitor_concurrent_call = 3,
 
+  // The call was interrupted due to an asynchronous enclave exit (AEX).
+  //
+  // This is only returned by enter_enclave, and can be considered a more
+  // specific case of monitor_concurrent_call. The caller should retry the
+  // enclave_enter call, so the enclave thread can make progress.
+  monitor_async_exit = 4,
+
   // The caller is not allowed to access a resource referenced by the API call.
   //
   // This is a more specific version of monitor_invalid_value. The monitor does
@@ -146,11 +153,11 @@ api_result_t attest_enclave(uintptr_t phys_addr);
 // metadata, which should not be modified.
 typedef struct {
   // The virtual address of the thread's entry point.
-  void (*entry_point)();
+  void (*entry_pc)();
   // The virtual address of the thread's stack top.
   void *entry_stack;
   // The virtual address of the thread's fault handler.
-  void (*fault_handler)();
+  void (*fault_pc)();
   // The virtual address of the fault handler's stack top.
   void *fault_stack;
 
@@ -281,14 +288,17 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
 // `enclave_id` must identify an enclave that has not yet been initialized.
 api_result_t init_enclave(enclave_id_t enclave_id);
 
-// Starts an enclave thread.
+// Starts executing enclave code on the current hardware thread.
+//
+// The application thread performing this system call will be suspended until
+// the enclave code executes an enclave exit, or is interrupted by an
+// asynchronous enclave exit.
 //
 // `enclave_id` must identify an enclave that has been initialized.
 //
 // `thread_id` must identify a hardware thread that was created but is not
 // executing on any core.
-api_result_t run_enclave_thread(enclave_id_t enclave_id,
-    thread_id_t thread_id);
+api_result_t enter_enclave(enclave_id_t enclave_id, thread_id_t thread_id);
 
 // Frees up all DRAM regions associated with an enclave.
 //

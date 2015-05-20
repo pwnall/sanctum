@@ -58,8 +58,10 @@ inline void set_edrb_map(uintptr_t phys_addr) {
   // TODO: asm intrinsic
 }
 
-struct enclave_exit_state_t {
-  // TODO: RISC V register state
+struct exec_state_t {
+  uintptr_t pc;       // x1
+  uintptr_t stack;    // x14
+  uintptr_t gprs[29]; // x2-13, x15-x31
 };
 
 };  // namespace sanctum::bare

@@ -10,6 +10,8 @@ using sanctum::bare::is_valid_range;
 using sanctum::bare::phys_ptr;
 using sanctum::bare::set_dmar_base;
 using sanctum::bare::set_dmar_mask;
+using sanctum::bare::set_drb_map;
+using sanctum::bare::set_edrb_map;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 using sanctum::internal::blocked_enclave_id;
@@ -20,6 +22,7 @@ using sanctum::internal::dram_region_info_t;
 using sanctum::internal::dram_region_start;
 using sanctum::internal::dram_region_tlb_flush;
 using sanctum::internal::dram_regions_info_t;
+using sanctum::internal::enclave_region_bitmap;
 using sanctum::internal::free_enclave_id;
 using sanctum::internal::g_core_count;
 using sanctum::internal::g_core;
@@ -32,6 +35,7 @@ using sanctum::internal::g_dram_region_mask;
 using sanctum::internal::g_dram_region_shift;
 using sanctum::internal::g_dram_size;
 using sanctum::internal::g_dram_stripe_size;
+using sanctum::internal::g_os_region_bitmap;
 using sanctum::internal::is_dram_address;
 using sanctum::internal::is_dynamic_dram_region;
 using sanctum::internal::is_valid_dram_region;
@@ -128,6 +132,10 @@ api_result_t block_dram_region(size_t dram_region) {
   // TODO: panic if block_clock is max_size_t
 
   set_enclave_region_bitmap_bit(owner, dram_region, false);
+  if (owner == 0)
+    set_drb_map(uintptr_t(g_os_region_bitmap));
+  else
+    set_edrb_map(uintptr_t(enclave_region_bitmap(owner)));
 
   clear_dram_region_lock(owner_dram_region);
   clear_dram_region_lock(dram_region);
@@ -279,6 +287,11 @@ api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
     phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
     region->*(&dram_region_info_t::owner) = new_owner;
     set_enclave_region_bitmap_bit(new_owner, dram_region, true);
+    // NOTE: This is an OS call, so we know for sure that no enclave DRAM
+    //       region bitmap is in effect. We only need to apply changes to the
+    //       OS DRAM region bitmap.
+    if (new_owner == 0)
+      set_drb_map(uintptr_t(g_os_region_bitmap));
     result = monitor_ok;
   } else {
     result = monitor_invalid_value;

@@ -102,8 +102,10 @@ inline void set_edrb_map(uintptr_t phys_addr) {
       testing::core_edrb_map[current_core()], phys_addr);
 }
 
-struct enclave_exit_state_t {
-  size_t rip;
+struct register_state_t {
+  uintptr_t pc;       // x1
+  uintptr_t stack;    // x14
+  uintptr_t gprs[29]; // x2-13, x15-x31
 };
 
 };  // namespace sanctum::bare

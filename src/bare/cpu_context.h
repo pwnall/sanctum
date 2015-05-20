@@ -98,8 +98,12 @@ void set_drb_map(uintptr_t phys_addr);
 // Loads the EDRBMAP (enclave DMA region bitmap) register from memory.
 void set_edrb_map(uintptr_t phys_addr);
 
-// The execution state saved by an asynchronous enclave exit.
-struct enclave_exit_state_t;
+// The execution context saved when the monitor is invoked.
+//
+// The structure is guaranteed to have the following members:
+// pc - program counter (RIP on x86)
+// sp - stack pointer
+struct register_state_t;
 
 };  // namespace sanctum::bare
 };  // namespace sanctum

@@ -2,6 +2,7 @@
 #define MONITOR_ENCLAVE_H_INCLUDED
 
 #include "bare/base_types.h"
+#include "bare/cpu_context.h"
 #include "bare/phys_atomics.h"
 #include "crypto/hash.h"
 #include "public/api.h"
@@ -13,6 +14,7 @@ using sanctum::api::enclave::thread_info_t;
 using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
 using sanctum::bare::phys_ptr;
+using sanctum::bare::register_state_t;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 using sanctum::crypto::hash_block_size;
@@ -23,7 +25,9 @@ struct thread_private_info_t {
   // The public thread_info_t must be at the beginning of the structure.
   thread_info_t ti;
 
-  atomic_flag exit_state_used;  // Set on AEX.
+  register_state_t exit_state;  // enter_enclave caller state
+  register_state_t aex_state;   // enclave state saved on AEX
+  size_t can_resume;            // true if the AEX state is valid
 };
 
 // Pointers to threads.

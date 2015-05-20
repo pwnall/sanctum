@@ -22,6 +22,7 @@ using sanctum::bare::atomic_fetch_add;
 using sanctum::bare::is_page_aligned;
 using sanctum::bare::page_size;
 using sanctum::bare::phys_ptr;
+using sanctum::bare::set_edrb_map;
 using sanctum::bare::set_epar_base;
 using sanctum::bare::set_epar_mask;
 using sanctum::bare::set_epar_pmask;
@@ -155,7 +156,7 @@ api_result_t delete_enclave(enclave_id_t enclave_id) {
   return monitor_ok;
 }
 
-api_result_t run_enclave_thread(enclave_id_t enclave_id,
+api_result_t enter_enclave(enclave_id_t enclave_id,
     thread_id_t thread_id) {
   size_t dram_region = clamped_dram_region_for(enclave_id);
   if (test_and_set_dram_region_lock(dram_region))
@@ -209,6 +210,7 @@ api_result_t run_enclave_thread(enclave_id_t enclave_id,
   set_epar_mask(enclave_info->*(&enclave_info_t::epar_mask));
   // TODO: set the permissions mask to allow reads
   set_epar_pmask(0);
+  set_edrb_map(uintptr_t(enclave_region_bitmap(enclave_id)));
   set_eptbr(thread->*(&thread_info_t::eptbr));
 
   // TODO: modify return state to perform an enclave jump
