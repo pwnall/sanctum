@@ -7,6 +7,16 @@
 namespace sanctum {
 namespace bare {
 
+// Sets the DMARBASE (DMA range base) register in the DMA master.
+//
+// This can only be called by the security monitor.
+void set_dmar_base(uintptr_t value);
+
+// Sets the DMARMASK (DMA range mask) register in the DMA master.
+//
+// This can only be called by the security monitor.
+void set_dmar_mask(uintptr_t value);
+
 // Obtains the DRAM size from the memory subsystem.
 //
 // The implementation may be very slow, so the return value should be cached.

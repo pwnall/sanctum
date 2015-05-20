@@ -6,7 +6,10 @@
 
 using sanctum::api::null_enclave_id;
 using sanctum::bare::atomic_flag_test_and_set;
+using sanctum::bare::is_valid_range;
 using sanctum::bare::phys_ptr;
+using sanctum::bare::set_dmar_base;
+using sanctum::bare::set_dmar_mask;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 using sanctum::internal::blocked_enclave_id;
@@ -14,17 +17,22 @@ using sanctum::internal::clear_dram_region_lock;
 using sanctum::internal::current_enclave;
 using sanctum::internal::dram_region_for;
 using sanctum::internal::dram_region_info_t;
+using sanctum::internal::dram_region_start;
 using sanctum::internal::dram_region_tlb_flush;
 using sanctum::internal::dram_regions_info_t;
 using sanctum::internal::free_enclave_id;
 using sanctum::internal::g_core_count;
 using sanctum::internal::g_core;
+using sanctum::internal::g_dma_range_end;
+using sanctum::internal::g_dma_range_start;
 using sanctum::internal::g_dram_regions;
 using sanctum::internal::g_dram_region;
 using sanctum::internal::g_dram_region_count;
 using sanctum::internal::g_dram_region_mask;
 using sanctum::internal::g_dram_region_shift;
 using sanctum::internal::g_dram_size;
+using sanctum::internal::g_dram_stripe_size;
+using sanctum::internal::is_dram_address;
 using sanctum::internal::is_dynamic_dram_region;
 using sanctum::internal::is_valid_dram_region;
 using sanctum::internal::is_valid_enclave_id;
@@ -44,6 +52,9 @@ size_t g_dram_region_count;
 size_t g_dram_region_mask;
 size_t g_dram_region_shift;
 size_t g_dram_region_bitmap_words;
+size_t g_dram_stripe_size;
+size_t g_dma_range_start;
+size_t g_dma_range_end;
 
 };  // namespace sanctum::internal
 };  // namespace sanctum
@@ -88,8 +99,28 @@ api_result_t block_dram_region(size_t dram_region) {
     return monitor_concurrent_call;
   }
 
+  if (owner_dram_region == 0) {
+    bool dma_range_crossed = false;
+    uintptr_t region_start = dram_region_start(dram_region);
+    uintptr_t region_end = dram_region_start(dram_region + 1);
+    if (g_dma_range_start >= region_start && g_dma_range_end <= region_end)
+      dma_range_crossed = true;
+    if (g_dma_range_end >= region_start && g_dma_range_end <= region_end)
+      dma_range_crossed = true;
+    if (region_start >= g_dma_range_start && region_start <= g_dma_range_end)
+      dma_range_crossed = true;
+    if (region_end >= g_dma_range_start && region_end <= g_dma_range_end)
+      dma_range_crossed = true;
+
+    if (dma_range_crossed) {
+      clear_dram_region_lock(owner_dram_region);
+      clear_dram_region_lock(dram_region);
+      return monitor_invalid_state;
+    }
+  }
+
   region->*(&dram_region_info_t::previous_owner) = owner;
-  atomic_store(&(region->*(&dram_region_info_t::owner)), blocked_enclave_id);
+  region->*(&dram_region_info_t::owner) = blocked_enclave_id;
   size_t block_clock = atomic_fetch_add(
       &(g_dram_regions->*(&dram_regions_info_t::block_clock)),
       static_cast<enclave_id_t>(1)) + 1;
@@ -170,6 +201,56 @@ enclave_id_t dram_region_owner(size_t dram_region) {
   return owner;
 }
 
+api_result_t set_dma_range(uintptr_t base, uintptr_t mask) {
+  if (!is_valid_range(base, mask))
+    return monitor_invalid_value;
+  // NOTE: the base is aligned to mask, so (base | mask) == base + mask
+  if (!is_dram_address(base | mask))
+    return monitor_invalid_value;
+  // NOTE: We acquire the lock for region 0 because that's required to block
+  //       the DRAM regions owned by the OS.
+  if (test_and_set_dram_region_lock(0))
+    return monitor_concurrent_call;
+
+  bool os_owns_regions = true;
+  uintptr_t range_end = (base | mask) + 1;
+  // NOTE: because DRAM regions might not be contiguous, we iterate over all
+  //       the stripes in the DMA range and check that their DRAM regions are
+  //       owned by the OS
+  for (uintptr_t stripe_addr = base; stripe_addr < range_end;
+       stripe_addr += g_dram_stripe_size) {
+    size_t dram_region = dram_region_for(stripe_addr);
+    if (dram_region != 0) {
+      if (test_and_set_dram_region_lock(dram_region)) {
+        clear_dram_region_lock(0);
+        return monitor_concurrent_call;
+      }
+    }
+    phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
+    if (region->*(&dram_region_info_t::owner) != 0)
+      os_owns_regions = false;
+
+    // NOTE: We're clearing each DRAM region lock after acquiring it, instead
+    //       of acquiring all locks and clearing them. We do this so we don't
+    //       have to do cascade releases if a lock acquisition fails. This is
+    //       acceptable because we hold the lock of DRAM region 0 at all times,
+    //       so we're guaranteed that no enclaves join or leave the group of
+    //       OS-owned enclaves, and that's all we care about.
+    if (dram_region != 0)
+      clear_dram_region_lock(dram_region);
+  }
+
+  g_dma_range_start = base;
+  g_dma_range_end = range_end;
+  set_dmar_base(base);
+  // NOTE: The hardware register stores the mask in negated form because it
+  //       simplifies checks.
+  set_dmar_mask(~mask);
+
+  clear_dram_region_lock(0);
+  return monitor_ok;
+}
+
 api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
   // NOTE: non-dynamic DRAM regions will never be freed, so we don't need to
   //       explicitly check for them here
@@ -196,7 +277,7 @@ api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
   api_result_t result;
   if (is_valid_enclave_id(new_owner)) {
     phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-    atomic_store(&(region->*(&dram_region_info_t::owner)), new_owner);
+    region->*(&dram_region_info_t::owner) = new_owner;
     set_enclave_region_bitmap_bit(new_owner, dram_region, true);
     result = monitor_ok;
   } else {
@@ -234,7 +315,7 @@ api_result_t free_dram_region(size_t dram_region) {
       }
     }
     if (can_free) {
-      atomic_store(&(region->*(&dram_region_info_t::owner)), free_enclave_id);
+      region->*(&dram_region_info_t::owner) = free_enclave_id;
       result = monitor_ok;
     } else {
       result = monitor_invalid_state;

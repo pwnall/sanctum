@@ -4,6 +4,12 @@
 namespace sanctum {
 namespace bare {
 
+inline void set_dmar_base(uintptr_t value) {
+  // TODO: asm intrinsics
+}
+inline void set_dmar_mask(uintptr_t value) {
+  // TODO: asm intrinsics
+}
 inline size_t read_dram_size() {
   // TODO: asm intrinsics
   return 0;

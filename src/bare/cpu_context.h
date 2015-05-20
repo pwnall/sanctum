@@ -46,15 +46,57 @@ void set_eptbr(uintptr_t value);
 // will lock up or reboot the machine.
 void set_ptbr(uintptr_t value);
 
-// Sets the EV_BASE (enclave virtual address base register).
+// Sets the EPARBASE (enclave protected address range base) register.
+//
+// This can only be issued by the security monitor. An invalid DRAM address
+// will lock up or reboot the machine.
+void set_epar_base(uintptr_t value);
+
+// Sets the PARBASE (protected address range base) register.
+//
+// This can only be issued by the security monitor. An invalid DRAM address
+// will lock up or reboot the machine.
+void set_par_base(uintptr_t value);
+
+// Sets the EPARMASK (enclave protected address range mask) register.
+//
+// This can only be issued by the security monitor. An invalid DRAM address
+// will lock up or reboot the machine.
+void set_epar_mask(uintptr_t value);
+
+// Sets the PARMASK (protected address range mask) register.
+//
+// This can only be issued by the security monitor. An invalid DRAM address
+// will lock up or reboot the machine.
+void set_par_mask(uintptr_t value);
+
+// Sets the EPARPMASK (enclave protected address range permission mask) reg.
+//
+// This can only be issued by the security monitor. An invalid DRAM address
+// will lock up or reboot the machine.
+void set_epar_pmask(uintptr_t value);
+
+// Sets the PARPMASK (protected address range permission mask) register.
+//
+// This can only be issued by the security monitor. An invalid DRAM address
+// will lock up or reboot the machine.
+void set_par_pmask(uintptr_t value);
+
+// Sets the EVBASE (enclave virtual address base register).
 //
 // This can only be issued by the security monitor.
 void set_ev_base(uintptr_t value);
 
-// Sets the EV_MASK (enclave virtual address mask register).
+// Sets the EVMASK (enclave virtual address mask register).
 //
 // This can only be issued by the security monitor.
 void set_ev_mask(uintptr_t value);
+
+// Loads the DRBMAP (DMA region bitmap) register from memory.
+void set_drb_map(uintptr_t phys_addr);
+
+// Loads the EDRBMAP (enclave DMA region bitmap) register from memory.
+void set_edrb_map(uintptr_t phys_addr);
 
 // The execution state saved by an asynchronous enclave exit.
 struct enclave_exit_state_t;

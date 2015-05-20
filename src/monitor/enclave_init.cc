@@ -9,6 +9,7 @@
 using sanctum::bare::atomic_fetch_add;
 using sanctum::bare::bcopy;
 using sanctum::bare::bzero;
+using sanctum::bare::ceil_power_of_two;
 using sanctum::bare::is_page_aligned;
 using sanctum::bare::is_valid_page_table_entry;
 using sanctum::bare::is_valid_range;
@@ -26,8 +27,8 @@ using sanctum::internal::dram_region_for;
 using sanctum::internal::dram_region_info_t;
 using sanctum::internal::dram_region_start;
 using sanctum::internal::enclave_info_t;
-using sanctum::internal::enclave_monitor_area_pages;
-using sanctum::internal::enclave_monitor_area_size;
+using sanctum::internal::enclave_metadata_pages;
+using sanctum::internal::enclave_metadata_size;
 using sanctum::internal::enclave_region_bitmap;
 using sanctum::internal::enclave_thread_slot;
 using sanctum::internal::enclave_thread_slots;
@@ -37,10 +38,10 @@ using sanctum::internal::extend_enclave_hash_with_thread;
 using sanctum::internal::finalize_enclave_hash;
 using sanctum::internal::free_enclave_id;
 using sanctum::internal::g_dram_region;
-using sanctum::internal::g_dram_region_shift;
+using sanctum::internal::g_dram_stripe_size;
 using sanctum::internal::init_enclave_hash;
 using sanctum::internal::is_dram_address;
-using sanctum::internal::is_enclave_monitor_address;
+using sanctum::internal::is_enclave_metadata_address;
 using sanctum::internal::is_enclave_virtual_address;
 using sanctum::internal::is_valid_enclave_id;
 using sanctum::internal::read_dram_region_owner;
@@ -65,26 +66,23 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
   if (ev_mask + 1 < page_size())
     return null_enclave_id;  // monitor_invalid_value
 
-  // The enclave's monitor area must not cross DRAM regions.
-  size_t monitor_area_size = enclave_monitor_area_size(max_threads);
-  size_t monitor_area_pages = enclave_monitor_area_pages(max_threads);
-  if (enclave_monitor_area_size(max_threads) > (1 << g_dram_region_shift)) {
+  // The enclave's metadata area must not cross DRAM regions.
+  size_t metadata_size = enclave_metadata_size(max_threads);
+  size_t metadata_pages = enclave_metadata_pages(max_threads);
+  if (metadata_size > g_dram_stripe_size)
     return null_enclave_id;  // monitor_unsupported
-  }
 
   enclave_id_t enclave_id{dram_region_start(dram_region)};
   phys_ptr<enclave_info_t> enclave_info{enclave_id};
   phys_ptr<thread_slot_t> thread_slots{enclave_thread_slots(enclave_id)};
 
-  if (test_and_set_dram_region_lock(dram_region)) {
+  if (test_and_set_dram_region_lock(dram_region))
     return monitor_concurrent_call;
-  }
 
   if (read_dram_region_owner(dram_region) == free_enclave_id) {
     phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-    atomic_store(&(region->*(&dram_region_info_t::owner)), enclave_id);
-    region->*(&dram_region_info_t::monitor_pages) = monitor_area_pages;
-    region->*(&dram_region_info_t::pinned_pages) = monitor_area_pages;
+    region->*(&dram_region_info_t::owner) = enclave_id;
+    region->*(&dram_region_info_t::pinned_pages) = metadata_pages;
 
     enclave_info->*(&enclave_info_t::max_threads) = max_threads;
     for (size_t i = 0; i < max_threads; ++i) {
@@ -99,10 +97,24 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
     enclave_info->*(&enclave_info_t::ev_base) = ev_base;
     enclave_info->*(&enclave_info_t::ev_mask) = ev_mask;
     enclave_info->*(&enclave_info_t::is_initialized) = 0;
-    enclave_info->*(&enclave_info_t::loading_eptbr) = 0;
-    enclave_info->*(&enclave_info_t::loading_last_addr) = 0;
-    enclave_info->*(&enclave_info_t::monitor_area_top) = enclave_id +
-      (monitor_area_pages << page_shift());
+
+    // NOTE: the enclave's monitor metadata area is protected by a range
+    //       register in the address translation, so its size must be a power
+    //       of two
+    size_t metadata_size = ceil_power_of_two(metadata_pages << page_shift());
+    enclave_info->*(&enclave_info_t::metadata_top) =
+        enclave_id + metadata_size;
+    enclave_info->*(&enclave_info_t::epar_mask) =
+        ~(static_cast<uintptr_t>(metadata_size) - 1);
+
+    // NOTE: it is safe to use 0 as the initial values here because that
+    //       physical address is in DRAM region 0, which can never be assigned
+    //       to an enclave
+    enclave_info->*(&enclave_info_t::load_eptbr) = 0;
+    enclave_info->*(&enclave_info_t::last_load_addr) = 0;
+
+    atomic_init(&(enclave_info->*(&enclave_info_t::running_threads)),
+        static_cast<size_t>(0));
 
     init_enclave_hash(enclave_info, ev_base, ev_mask, max_threads);
   } else {
@@ -140,7 +152,7 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
     clear_dram_region_lock(dram_region);
     return monitor_invalid_state;
   }
-  if (phys_addr <= enclave_info->*(&enclave_info_t::loading_last_addr)) {
+  if (phys_addr <= enclave_info->*(&enclave_info_t::last_load_addr)) {
     clear_dram_region_lock(dram_region);
     return monitor_invalid_value;
   }
@@ -149,7 +161,7 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
     clear_dram_region_lock(dram_region);
     return monitor_invalid_value;
   }
-  if (is_enclave_monitor_address(phys_addr, enclave_id)) {
+  if (is_enclave_metadata_address(phys_addr, enclave_id)) {
     clear_dram_region_lock(dram_region);
     return monitor_invalid_value;
   }
@@ -175,11 +187,11 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
   // then editing the level N + 1 table to point to our new table.
   size_t edit_level = level + 1;
   if (edit_level == page_table_levels()) {
-    enclave_info->*(&enclave_info_t::loading_eptbr) = phys_addr;
+    enclave_info->*(&enclave_info_t::load_eptbr) = phys_addr;
     // NOTE: we completely ignore virtual_addr here; we don't bother checking
     //       that it's zero because the call gets measured
   } else {
-    uintptr_t ptb = enclave_info->*(&enclave_info_t::loading_eptbr);
+    uintptr_t ptb = enclave_info->*(&enclave_info_t::load_eptbr);
     uintptr_t entry_addr = walk_page_tables_to_entry(ptb, virtual_addr,
         edit_level);
     if (entry_addr == 0 || is_valid_page_table_entry(entry_addr, edit_level)) {
@@ -189,9 +201,9 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
     write_page_table_entry(entry_addr, edit_level, phys_addr, acl);
   }
 
-  // NOTE: loading_last_addr points to the last allocated physical page, so we
-  //       have to subtract a page from the page table's end address.
-  enclave_info->*(&enclave_info_t::loading_last_addr) = phys_end - page_size();
+  // NOTE: last_load_addr points to the last allocated physical page, so
+  //       we have to subtract a page from the page table's end address.
+  enclave_info->*(&enclave_info_t::last_load_addr) = phys_end - page_size();
   bzero(phys_ptr<size_t>{phys_addr}, table_size);
 
   extend_enclave_hash_with_page_table(enclave_info, virtual_addr, level, acl);
@@ -223,7 +235,7 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
     clear_dram_region_lock(dram_region);
     return monitor_invalid_state;
   }
-  if (phys_addr <= enclave_info->*(&enclave_info_t::loading_last_addr)) {
+  if (phys_addr <= enclave_info->*(&enclave_info_t::last_load_addr)) {
     clear_dram_region_lock(dram_region);
     return monitor_invalid_value;
   }
@@ -231,7 +243,7 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
     clear_dram_region_lock(dram_region);
     return monitor_invalid_value;
   }
-  if (is_enclave_monitor_address(phys_addr, enclave_id)) {
+  if (is_enclave_metadata_address(phys_addr, enclave_id)) {
     clear_dram_region_lock(dram_region);
     return monitor_invalid_value;
   }
@@ -244,7 +256,7 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
     return monitor_invalid_value;
   }
 
-  uintptr_t ptb = enclave_info->*(&enclave_info_t::loading_eptbr);
+  uintptr_t ptb = enclave_info->*(&enclave_info_t::load_eptbr);
   uintptr_t entry_addr = walk_page_tables_to_entry(ptb, virtual_addr, 0);
   if (entry_addr == 0 || is_valid_page_table_entry(entry_addr, 0)) {
     clear_dram_region_lock(dram_region);
@@ -275,7 +287,7 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
     return monitor_access_denied;
   }
 
-  enclave_info->*(&enclave_info_t::loading_last_addr) = phys_addr;
+  enclave_info->*(&enclave_info_t::last_load_addr) = phys_addr;
   bcopy(phys_ptr<size_t>{phys_addr}, phys_ptr<size_t>{os_addr}, page_size());
   clear_dram_region_lock(os_dram_region);
 
@@ -322,7 +334,7 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
     return monitor_invalid_value;
   }
 
-  uintptr_t ptb = enclave_info->*(&enclave_info_t::loading_eptbr);
+  uintptr_t ptb = enclave_info->*(&enclave_info_t::load_eptbr);
   phys_ptr<size_t> region_bitmap = enclave_region_bitmap(enclave_id);
   uintptr_t phys_addr = walk_page_tables(ptb, virtual_addr);
   uintptr_t phys_end = phys_addr + thread_private_info_size();

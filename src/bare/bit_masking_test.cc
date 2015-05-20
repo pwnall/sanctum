@@ -3,6 +3,7 @@
 #include "gtest/gtest.h"
 
 using sanctum::bare::address_bits_for;
+using sanctum::bare::ceil_power_of_two;
 using sanctum::bare::is_aligned_to_mask;
 using sanctum::bare::is_page_aligned;
 using sanctum::bare::is_valid_range;
@@ -73,8 +74,23 @@ TEST(BitMaskingTest, AddressBitsFor) {
   ASSERT_EQ(3, address_bits_for(8));
   ASSERT_EQ(4, address_bits_for(9));
   ASSERT_EQ(4, address_bits_for(16));
+  ASSERT_EQ(16, address_bits_for(65535));
   ASSERT_EQ(16, address_bits_for(65536));
 }
+
+TEST(BitMaskingTest, CeilPowerOfTwo) {
+  ASSERT_EQ(1, ceil_power_of_two(1));
+  ASSERT_EQ(2, ceil_power_of_two(2));
+  ASSERT_EQ(4, ceil_power_of_two(3));
+  ASSERT_EQ(4, ceil_power_of_two(4));
+  ASSERT_EQ(8, ceil_power_of_two(5));
+  ASSERT_EQ(8, ceil_power_of_two(8));
+  ASSERT_EQ(16, ceil_power_of_two(9));
+  ASSERT_EQ(16, ceil_power_of_two(16));
+  ASSERT_EQ(65536, ceil_power_of_two(65535));
+  ASSERT_EQ(65536, ceil_power_of_two(65536));
+}
+
 
 TEST(BitMaskingTest, ReverseBytes) {
   ASSERT_EQ(0xff000000U, reverse_bytes(0xffU));

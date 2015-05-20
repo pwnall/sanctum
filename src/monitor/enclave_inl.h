@@ -46,19 +46,19 @@ inline phys_ptr<thread_slot_t> enclave_thread_slot(enclave_id_t enclave_id,
 //
 // This returns the precise amount of memory used by the monitor. However, all
 // memory management happens at page granularity, so
-// enclave_monitor_area_pages() is a better reflect of the amount of DRAM
+// enclave_metadata_area_pages() is a better reflect of the amount of DRAM
 // allocated to monitor pages.
-inline size_t enclave_monitor_area_size(size_t max_threads) {
+inline size_t enclave_metadata_size(size_t max_threads) {
   return static_cast<size_t>(uintptr_t(enclave_thread_slots(0) + max_threads));
 }
 
 // The number of pages used by the security monitor for an enclave.
 //
-// See enclave_monitor_area_size() for an explanation of the security monitor's
+// See enclave_metadata_area_size() for an explanation of the security monitor's
 // data. The monitor pages are at the beginning of the enclave's main DRAM
 // region.
-inline size_t enclave_monitor_area_pages(size_t max_threads) {
-  return (enclave_monitor_area_size(max_threads) + page_size() - 1)
+inline size_t enclave_metadata_pages(size_t max_threads) {
+  return (enclave_metadata_size(max_threads) + page_size() - 1)
       >> page_shift();
 }
 
@@ -101,11 +101,11 @@ inline bool is_enclave_virtual_address(uintptr_t virtual_addr,
 // Checks if a physical address points to an enclave's monitor-reserved pages.
 //
 // The caller should hold the lock of the enclave's main DRAM region.
-inline bool is_enclave_monitor_address(uintptr_t addr,
+inline bool is_enclave_metadata_address(uintptr_t addr,
     enclave_id_t enclave_id) {
   phys_ptr<enclave_info_t> enclave_info{enclave_id};
   return addr >= enclave_id &&
-      addr <= enclave_info->*(&enclave_info_t::monitor_area_top);
+      addr <= enclave_info->*(&enclave_info_t::metadata_top);
 }
 
 // The size of an enclave hardware thread's metadata, in bytes.

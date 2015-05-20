@@ -27,10 +27,34 @@ inline void set_eptbr(uintptr_t value) {
 inline void set_ptbr(uintptr_t value) {
   // TODO: asm intrinsic
 }
+inline void set_epar_base(uintptr_t value) {
+  // TODO: asm intrinsic
+}
+inline void set_par_base(uintptr_t value) {
+  // TODO: asm intrinsic
+}
+inline void set_epar_mask(uintptr_t value) {
+  // TODO: asm intrinsic
+}
+inline void set_par_mask(uintptr_t value) {
+  // TODO: asm intrinsic
+}
+inline void set_epar_pmask(uintptr_t value) {
+  // TODO: asm intrinsic
+}
+inline void set_par_pmask(uintptr_t value) {
+  // TODO: asm intrinsic
+}
 inline void set_ev_base(uintptr_t value) {
   // TODO: asm intrinsic
 }
 inline void set_ev_mask(uintptr_t value) {
+  // TODO: asm intrinsic
+}
+inline void set_drb_map(uintptr_t phys_addr) {
+  // TODO: asm intrinsic
+}
+inline void set_edrb_map(uintptr_t phys_addr) {
   // TODO: asm intrinsic
 }
 

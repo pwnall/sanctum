@@ -27,6 +27,11 @@ void boot_init_dram_regions();
 // constants are set.
 void boot_init_dynamic_arrays();
 
+// Sets up the hardware registers needed to protect the monitor from the OS.
+//
+// This must be called after all the monitor's memory is allocated.
+void boot_init_protection();
+
 // Stops the monitor's boot process.
 //
 // This is called when the monitor concludes that the platform violates a core

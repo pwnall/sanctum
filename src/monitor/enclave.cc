@@ -22,6 +22,9 @@ using sanctum::bare::atomic_fetch_add;
 using sanctum::bare::is_page_aligned;
 using sanctum::bare::page_size;
 using sanctum::bare::phys_ptr;
+using sanctum::bare::set_epar_base;
+using sanctum::bare::set_epar_mask;
+using sanctum::bare::set_epar_pmask;
 using sanctum::bare::set_eptbr;
 using sanctum::bare::set_ev_base;
 using sanctum::bare::set_ev_mask;
@@ -44,7 +47,7 @@ using sanctum::internal::free_enclave_id;
 using sanctum::internal::g_dram_region;
 using sanctum::internal::g_dram_region_count;
 using sanctum::internal::is_dram_address;
-using sanctum::internal::is_enclave_monitor_address;
+using sanctum::internal::is_enclave_metadata_address;
 using sanctum::internal::is_valid_enclave_id;
 using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::read_enclave_region_bitmap_bit;
@@ -129,15 +132,13 @@ api_result_t delete_enclave(enclave_id_t enclave_id) {
       continue;  // This region does not belong to the enclave.
 
     phys_ptr<dram_region_info_t> region = &g_dram_region[i];
-    atomic_store(&(region->*(&dram_region_info_t::owner)), free_enclave_id);
+    region->*(&dram_region_info_t::owner) = free_enclave_id;
 
-    // NOTE: The enclave's DRAM regions have monitor-reserved pages and pinned
-    //       pages, due to threads. The rest of the system assumes that both
-    //       monitor_pages and pinned_pages are zero for a DRAM-region once the
-    //       region is blocked, which is a prerequisite to the DRAM region
-    //       being freed. So, we must make sure that these numbers to zero for
-    //       the DRAM regions that we free.
-    region->*(&dram_region_info_t::monitor_pages) = 0;
+    // NOTE: The enclave's DRAM regions have pages and pinned pages, due to
+    //       threads. The rest of the system assumes that pinned_pages is zero
+    //       for a DRAM-region once the region is blocked, which is a
+    //       prerequisite to the DRAM region being freed. So, we must make sure
+    //       that pinned_pages is zero for the DRAM regions that we free.
     region->*(&dram_region_info_t::pinned_pages) = 0;
 
     bzero_dram_region(i);
@@ -204,6 +205,10 @@ api_result_t run_enclave_thread(enclave_id_t enclave_id,
       &(private_thread->*(&thread_private_info_t::ti))};
   set_ev_base(enclave_info->*(&enclave_info_t::ev_base));
   set_ev_mask(enclave_info->*(&enclave_info_t::ev_mask));
+  set_epar_base(uintptr_t(enclave_info));
+  set_epar_mask(enclave_info->*(&enclave_info_t::epar_mask));
+  // TODO: set the permissions mask to allow reads
+  set_epar_pmask(0);
   set_eptbr(thread->*(&thread_info_t::eptbr));
 
   // TODO: modify return state to perform an enclave jump
@@ -254,7 +259,7 @@ api_result_t debug_enclave_copy_page(enclave_id_t enclave_id,
   // enclaves. The monitor-reserved pages contain physical addresses and the
   // enclave's DRAM region bitmap, which are trusted. Allowing the OS to write
   // them would enalbe attacks on other (possibly non-debug) enclaves.
-  if (is_enclave_monitor_address(enclave_addr, enclave_id) &&
+  if (is_enclave_metadata_address(enclave_addr, enclave_id) &&
       read_from_enclave == false)
     result = monitor_access_denied;
 
@@ -319,7 +324,7 @@ api_result_t create_enclave_thread(thread_id_t thread_id,
       clear_dram_region_lock(dram_region);
       return monitor_unsupported;
     }
-    if (is_enclave_monitor_address(page_addr, enclave_id)) {
+    if (is_enclave_metadata_address(page_addr, enclave_id)) {
       clear_dram_region_lock(dram_region);
       return monitor_invalid_value;
     }
@@ -433,6 +438,9 @@ api_result_t exit_enclave() {
   set_eptbr(0);
   set_ev_base(0);
   set_ev_mask(0);
+  set_epar_base(0);
+  set_epar_mask(0);
+  set_epar_pmask(0);
 
   atomic_fetch_sub(&(enclave_info->*(&enclave_info_t::running_threads)),
       static_cast<size_t>(1));
@@ -481,7 +489,7 @@ api_result_t attest_enclave(uintptr_t phys_addr) {
       clear_dram_region_lock(dram_region);
       return monitor_invalid_state;
     }
-    if (is_enclave_monitor_address(page_addr, enclave_id)) {
+    if (is_enclave_metadata_address(page_addr, enclave_id)) {
       clear_dram_region_lock(dram_region);
       return monitor_invalid_value;
     }

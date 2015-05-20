@@ -10,8 +10,24 @@ using sanctum::bare::read_cache_set_count;
 using sanctum::bare::read_dram_size;
 using sanctum::bare::read_min_cache_index_shift;
 using sanctum::bare::read_max_cache_index_shift;
+using sanctum::bare::set_dmar_base;
+using sanctum::bare::set_dmar_mask;
 using sanctum::testing::phys_buffer;
 using sanctum::testing::phys_buffer_size;
+
+TEST(MemoryTest, SetDmarBase) {
+  set_dmar_base(0x21000000);
+  ASSERT_EQ(0x21000000, sanctum::testing::dmar_base);
+  set_dmar_base(0);
+  ASSERT_EQ(0, sanctum::testing::dmar_base);
+}
+
+TEST(MemoryTest, SetDmarMask) {
+  set_dmar_mask(0x1fffff);
+  ASSERT_EQ(0x1fffff, sanctum::testing::dmar_mask);
+  set_dmar_mask(0);
+  ASSERT_EQ(0, sanctum::testing::dmar_mask);
+}
 
 TEST(MemoryTest, ReadDramSize) {
   sanctum::testing::dram_size = 1 << 30;

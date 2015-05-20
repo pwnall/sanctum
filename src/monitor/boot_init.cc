@@ -11,6 +11,7 @@ using sanctum::api::os::dram_region_owned;
 using sanctum::bare::atomic_flag_clear;
 using sanctum::bare::atomic_init;
 using sanctum::bare::address_bits_for;
+using sanctum::bare::ceil_power_of_two;
 using sanctum::bare::is_shared_cache;
 using sanctum::bare::page_shift;
 using sanctum::bare::read_cache_levels;
@@ -21,6 +22,12 @@ using sanctum::bare::read_dram_size;
 using sanctum::bare::read_min_cache_index_shift;
 using sanctum::bare::read_max_cache_index_shift;
 using sanctum::bare::set_cache_index_shift;
+using sanctum::bare::set_drb_map;
+using sanctum::bare::set_dmar_base;
+using sanctum::bare::set_dmar_mask;
+using sanctum::bare::set_par_base;
+using sanctum::bare::set_par_mask;
+using sanctum::bare::set_par_pmask;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 
@@ -86,8 +93,9 @@ void boot_init_dram_regions() {
   // TODO: figure out if this requires coordination between cores.
   set_cache_index_shift(index_shift);
 
-  g_dram_region_mask = (g_dram_region_count - 1) <<
-      (page_shift() + index_shift);
+  g_dram_region_shift = page_shift() + index_shift;
+  g_dram_stripe_size = 1 << g_dram_region_shift;
+  g_dram_region_mask = (g_dram_region_count - 1) << g_dram_region_shift;
 
   // NOTE: relying on the compiler to optimize division to bitwise shift
   g_dram_region_bitmap_words =
@@ -104,9 +112,8 @@ void boot_init_dynamic_arrays() {
   for (size_t i = 0; i < g_dram_region_count; ++i) {
     phys_ptr<dram_region_info_t> region{g_dram_region + i};
     atomic_flag_clear(&(region->*(&dram_region_info_t::lock)));
-    atomic_init(&(region->*(&dram_region_info_t::owner)), null_enclave_id);
+    region->*(&dram_region_info_t::owner) = null_enclave_id;
     region->*(&dram_region_info_t::previous_owner) = null_enclave_id;
-    region->*(&dram_region_info_t::monitor_pages) = 0;
     region->*(&dram_region_info_t::pinned_pages) = 0;
     region->*(&dram_region_info_t::blocked_at) = 0;
   }
@@ -118,7 +125,31 @@ void boot_init_dynamic_arrays() {
 
   g_os_region_bitmap = phys_ptr<size_t>{g_monitor_top};
   g_monitor_top = uintptr_t(g_os_region_bitmap + g_dram_region_bitmap_words);
-  bzero(g_os_region_bitmap, sizeof(size_t) * g_dram_region_bitmap_words);
+  for (size_t i = 0; i < g_dram_region_count; ++i)
+    set_bitmap_bit(g_os_region_bitmap, i, 1);
+}
+
+void boot_init_protection() {
+  // The monitor's code and data will be covered by a range in the address
+  // translation, so we must round it up to a power of two.
+  g_monitor_top = ceil_power_of_two(g_monitor_top);
+  set_par_base(static_cast<uintptr_t>(0));
+  set_par_mask(~(static_cast<uintptr_t>(g_monitor_top - 1)));
+  // NOTE: We're disallowing reads into the monitor space because it contains
+  //       the private attestation key. Ideally, we'd like to allow the OS to
+  //       read most of the monitor. However, we only have one protection range
+  //       available.
+  set_par_pmask(0);
+  set_drb_map(uintptr_t(g_os_region_bitmap));
+
+  if (g_monitor_top > g_dram_stripe_size)
+    boot_panic();  // Sanctum assumes that the monitor fits into a DRAM stripe.
+
+  // NOTE: we're allowing DMA transfers for 1 byte at the
+  g_dma_range_start = g_monitor_top;
+  g_dma_range_end = g_dma_range_start + 1;
+  set_dmar_base(g_dma_range_start);
+  set_dmar_mask(~(static_cast<uintptr_t>(0)));
 }
 
 };  // namespace sanctum::internal

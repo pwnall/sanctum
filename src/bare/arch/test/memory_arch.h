@@ -6,6 +6,7 @@
 namespace sanctum {
 namespace testing {
 
+extern size_t dmar_base, dmar_mask;
 extern size_t dram_size;
 extern size_t cache_levels;
 extern size_t min_cache_index_shift, max_cache_index_shift;
@@ -19,6 +20,13 @@ extern size_t cache_line_size[], cache_set_count[];
 namespace sanctum {
 namespace bare {
 
+
+inline void set_dmar_base(uintptr_t value) {
+  testing::dmar_base = value;
+}
+inline void set_dmar_mask(uintptr_t value) {
+  testing::dmar_mask = value;
+}
 inline size_t read_dram_size() { return testing::dram_size; }
 inline size_t read_cache_levels() { return testing::cache_levels; }
 inline bool is_shared_cache(size_t cache_level) {

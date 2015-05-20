@@ -175,6 +175,11 @@ typedef enum {
   dram_region_owned = 3,
 } dram_region_state_t;
 
+// Sets the memory range that allows DMA transfers.
+//
+// The range must be entirely contained in DRAM regions allocated to the OS.
+api_result_t set_dma_range(uintptr_t base, uintptr_t mask);
+
 // The state of the DRAM region with the given index.
 //
 // Returns dram_region_invalid if the given DRAM region index is invalid.

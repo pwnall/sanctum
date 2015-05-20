@@ -19,9 +19,8 @@ using sanctum::bare::uintptr_t;
 // Per-DRAM region accounting information.
 struct dram_region_info_t {
   atomic_flag lock;             // lock for all the DRAM region's state
-  atomic<enclave_id_t> owner;   // nullptr if not owned by enclave
+  enclave_id_t owner;           // nullptr if not owned by enclave
   enclave_id_t previous_owner;  // nullptr if previously owned by OS
-  size_t monitor_pages;         // pages reserved for the monitor
   size_t pinned_pages;          // pages that can't be removed from DRAM
   size_t blocked_at;            // only valid for blocked regions
 };
@@ -52,14 +51,34 @@ extern size_t g_dram_region_mask;
 extern size_t g_dram_region_shift;
 // The number of DRAM regions indexed by the mask.
 //
-// This is always 1 + g_dram_region_mask.
+// This is always 1 + (g_dram_region_mask >> g_dram_region_shift).
 extern size_t g_dram_region_count;
+// The size of a DRAM stripe.
+//
+// Stripes are continuous ranges of DRAM. A region is made up of multiple
+// stripes. If the cache address shift is optimal, each DRAM region is
+// contiguous and has exactly one stripe. Otherwise, the stripes alternate in
+// DRAM as follows.
+//
+// R1S1 R1S2 ... R1Sn R2S1 R2S2 ... R2Sn ... RmS1 RmS2 ... RmSn
+//
+// The stripe size is always (1 << g_dram_region_shift).
+extern size_t g_dram_stripe_size;
 
 // The size of a DRAM region bitmap, in units of sizeof(size_t).
 //
 // This is ceil(g_dram_region_count / (sizeof(size_t) * 8)).
 extern size_t g_dram_region_bitmap_words;
 
+// The first byte of the allowed DMA transfers memory range.
+//
+// Accesses to this must have acquired the lock of DRAM region 0.
+extern size_t g_dma_range_start;
+
+// The first byte past the allowed DMA transfers memory range.
+//
+// Accesses to this must have acquired the lock of DRAM region 0.
+extern size_t g_dma_range_end;
 
 // The special enclave ID values below are used to make it possible to infer a
 // DRAM region's state by doing an atomic read over its owner field. The values

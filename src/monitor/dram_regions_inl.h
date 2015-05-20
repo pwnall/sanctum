@@ -89,12 +89,10 @@ inline bool is_dynamic_dram_region(size_t dram_region) {
 inline bool is_valid_enclave_id(enclave_id_t enclave_id) {
   size_t dram_region = clamped_dram_region_for(enclave_id);
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-  enclave_id_t region_owner = atomic_load(
-      &(region->*(&dram_region_info_t::owner)));
 
   // NOTE: the first DRAM region always belongs to the OS, so this returns true
   //       when enclave_id is 0 / null_enclave_id (indicating OS ownership)
-  return region_owner == enclave_id;
+  return region->*(&dram_region_info_t::owner) == enclave_id;
 }
 
 // Verifies that a physical address belongs in DRAM.
@@ -108,16 +106,18 @@ inline bool is_dram_address(uintptr_t address) {
 // Reads the owner from a DRAM region.
 inline enclave_id_t read_dram_region_owner(size_t dram_region) {
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-  return atomic_load(&(region->*(&dram_region_info_t::owner)));
+  return region->*(&dram_region_info_t::owner);
 }
 
 // Wipes the data in a DRAM region.
 inline void bzero_dram_region(size_t dram_region) {
-  uintptr_t dram_strip_step = g_dram_region_mask + 1;
+  // The address diff between two stripes belonging to the same DRAM region.
+  uintptr_t stripe_step = g_dram_region_count << g_dram_region_shift;
+
   uintptr_t region_start = dram_region << g_dram_region_shift;
-  for (uintptr_t strip = 0; strip < g_dram_size; strip += dram_strip_step) {
-    uintptr_t strip_start = strip | region_start;
-    bzero(phys_ptr<size_t>{strip_start}, (1 << g_dram_region_shift));
+  for (uintptr_t stripe = 0; stripe < g_dram_size; stripe += stripe_step) {
+    uintptr_t stripe_start = stripe | region_start;
+    bzero(phys_ptr<size_t>{stripe_start}, g_dram_stripe_size);
   }
 }
 

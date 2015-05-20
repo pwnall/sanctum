@@ -5,6 +5,7 @@ using namespace sanctum::bare;
 namespace sanctum {
 namespace testing {
 
+size_t dmar_base, dmar_mask;
 size_t dram_size;
 size_t cache_levels;
 size_t min_cache_index_shift;

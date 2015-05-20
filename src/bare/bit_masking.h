@@ -50,6 +50,10 @@ inline size_t address_bits_for(size_t memory_size) {
   return bits;
 }
 
+// The smallest power of two that is greater or equal to a quantity.
+inline size_t ceil_power_of_two(size_t memory_size) {
+  return 1 << address_bits_for(memory_size);
+}
 
 // Sets or clears a bit in a bitmap.
 //

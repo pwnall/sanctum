@@ -52,6 +52,9 @@ struct enclave_info_t {
   // The mask of the enclave's virtual address range.
   uintptr_t ev_mask;
 
+  // The mask for the enclave's protected address range.
+  uintptr_t epar_mask;
+
   // non-zero when the enclave was initialized and can execute threads.
   // NOTE: this isn't bool because we don't want to specialize phys_ptr<bool>.
   size_t is_initialized;
@@ -59,17 +62,17 @@ struct enclave_info_t {
   // non-zero for debug enclaves.
   size_t is_debug;
 
+  // The end of the monitor metadata area at the beginning of the enclave.
+  uintptr_t metadata_top;
+
   // Physical address of the enclave's page table base during loading.
   //
   // This is set by the first load_enclave_page_table() call, and forced as the
   // EPTBR value for enclave threads created by load_enclave_thread.
-  uintptr_t loading_eptbr;
+  uintptr_t load_eptbr;
 
   // The phyiscal address of the last page loaded into the enclave by the OS.
-  uintptr_t loading_last_addr;
-
-  // The end of the monitor area at the beginning of the enclave.
-  uintptr_t monitor_area_top;
+  uintptr_t last_load_addr;
 
   // Number of enclave threads running on cores.
   //
