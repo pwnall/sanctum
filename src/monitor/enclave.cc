@@ -213,6 +213,9 @@ api_result_t enter_enclave(enclave_id_t enclave_id,
   set_edrb_map(uintptr_t(enclave_region_bitmap(enclave_id)));
   set_eptbr(thread->*(&thread_info_t::eptbr));
 
+  // TODO: set the hypervisor and OS handler addresses to monitor functions
+  //       that fault if the enclave attempts to perform syscalls or hypercalls
+
   // TODO: modify return state to perform an enclave jump
 
   return monitor_ok;
@@ -438,15 +441,22 @@ api_result_t exit_enclave() {
 
   core->*(&core_info_t::enclave_id) = null_enclave_id;
   set_eptbr(0);
-  set_ev_base(0);
+
+  // NOTE: The values below make sure that the enclave registers will never
+  //       be selected by the page walker input's MUXes. The address AND mask
+  //       is 0, so the AND result will always be 0, and it will be compared
+  //       with a non-zero number.
+  set_ev_base(page_size());
   set_ev_mask(0);
-  set_epar_base(0);
-  set_epar_mask(0);
-  set_epar_pmask(0);
+  // NOTE: we don't need to reset eptbr, edrb_map and epar_{base, mask, pmask},
+  //       because they'll never make it out of the page walker input MUXes.
 
   atomic_fetch_sub(&(enclave_info->*(&enclave_info_t::running_threads)),
       static_cast<size_t>(1));
   atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
+
+  // TODO: restore the hypervisor and OS handler addresses changed in
+  //       enter_enclave
 
   // TODO: modify return state to return to the run_enclave_thread() caller
 
