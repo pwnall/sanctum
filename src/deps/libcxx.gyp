@@ -11,6 +11,7 @@
       ],
       'sources': [
         '../../deps/libcxx/src/algorithm.cpp',
+        '../../deps/libcxx/src/any.cpp',
         '../../deps/libcxx/src/bind.cpp',
         '../../deps/libcxx/src/chrono.cpp',
         '../../deps/libcxx/src/condition_variable.cpp',

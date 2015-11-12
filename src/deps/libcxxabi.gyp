@@ -18,6 +18,7 @@
         '../../deps/libcxxabi/src/cxa_handlers.cpp',
         '../../deps/libcxxabi/src/cxa_new_delete.cpp',
         '../../deps/libcxxabi/src/cxa_personality.cpp',
+        '../../deps/libcxxabi/src/cxa_thread_atexit.cpp',
         '../../deps/libcxxabi/src/cxa_unexpected.cpp',
         '../../deps/libcxxabi/src/cxa_vector.cpp',
         '../../deps/libcxxabi/src/cxa_virtual.cpp',
