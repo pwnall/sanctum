@@ -2,10 +2,8 @@
 *.sw*
 .DS_Store
 
-# Build tools.
-build/ninja
-build/llvm
-build/llvm-build/
+# Build infrastracture.
+build/
 
 # Build products.
 out/

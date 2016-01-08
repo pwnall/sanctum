@@ -1,13 +1,43 @@
-language: cpp
 sudo: false
-compiler: gcc
-before_script:
-  - ./build/deps.sh
-  - ./build/run_gyp.sh
+# sudo: required
+os: linux
+# dist: trusty
+language: generic
+addons:
+  apt:
+    sources:
+      - llvm-toolchain-precise-3.7
+      - ubuntu-toolchain-r-test
+    packages:
+      - clang-3.7
+      - g++-5
+
 env:
-  - BUILD=Debug
-  - BUILD=Release
-script: ./build/ninja -C out/$BUILD &&
-    ./out/$BUILD/bare_tests &&
-    ./out/$BUILD/crypto_tests &&
-    ./out/$BUILD/monitor_tests
+  global:
+    - CC=clang-3.7
+    - CXX=clang++-3.7
+  matrix:
+    #    - BUILD=Debug
+    - BUILD=Release
+
+install:
+  # Check baseline memory usage; useful to know when OOMs occur
+  - free
+  - vmstat
+  - ps aux --sort=-rss | head -n 10
+
+  # Run the scripts in scripts/deps/all.sh one at a time. This buys a little
+  # time, as Travis limits each step here to 50 minutes.
+  - ./scripts/deps/setup.sh
+  - ./scripts/deps/ninja.sh
+  - ./scripts/deps/cmake.sh
+  - ./scripts/deps/llvm.sh
+
+before_script:
+  - ./build/run_gyp.sh
+
+script:
+  - ./build/ninja -C out/$BUILD
+  - ./out/$BUILD/bare_tests
+  - ./out/$BUILD/crypto_tests
+  - ./out/$BUILD/monitor_tests

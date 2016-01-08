@@ -10,7 +10,7 @@ RISC V processor.
 ### One-Time Setup
 
 ```bash
-./build/deps.sh
+./scripts/deps/all.sh
 ./build/run_gyp.sh
 ```
 
