@@ -1,0 +1,13 @@
+language: cpp
+sudo: false
+compiler: gcc
+before_script:
+  - ./build/deps.sh
+  - ./build/run_gyp.sh
+env:
+  - BUILD=Debug
+  - BUILD=Release
+script: ./build/ninja -C out/$BUILD &&
+    ./out/$BUILD/bare_tests &&
+    ./out/$BUILD/crypto_tests &&
+    ./out/$BUILD/monitor_tests
