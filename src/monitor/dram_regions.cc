@@ -40,6 +40,7 @@ using sanctum::internal::is_dram_address;
 using sanctum::internal::is_dynamic_dram_region;
 using sanctum::internal::is_valid_dram_region;
 using sanctum::internal::is_valid_enclave_id;
+using sanctum::internal::metadata_enclave_id;
 using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::set_enclave_region_bitmap_bit;
 using sanctum::internal::test_and_set_dram_region_lock;
@@ -56,6 +57,7 @@ size_t g_dram_region_count;
 size_t g_dram_region_mask;
 size_t g_dram_region_shift;
 size_t g_dram_region_bitmap_words;
+size_t g_dram_stripe_count;
 size_t g_dram_stripe_size;
 size_t g_dma_range_start;
 size_t g_dma_range_end;
@@ -310,8 +312,9 @@ api_result_t free_dram_region(size_t dram_region) {
     return monitor_concurrent_call;
 
   api_result_t result;
-  if (read_dram_region_owner(dram_region) == blocked_enclave_id) {
-    phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
+  enclave_id_t region_owner = read_dram_region_owner(dram_region);
+  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
+  if (region_owner == blocked_enclave_id) {
     size_t blocked_at = region->*(&dram_region_info_t::blocked_at);
 
     bool can_free = true;
@@ -328,6 +331,19 @@ api_result_t free_dram_region(size_t dram_region) {
       }
     }
     if (can_free) {
+      region->*(&dram_region_info_t::owner) = free_enclave_id;
+      result = monitor_ok;
+    } else {
+      result = monitor_invalid_state;
+    }
+  } else if (region_owner == metadata_enclave_id) {
+    // NOTE: Specializing for metadata_enclave_id here takes less code than
+    //       trying to handle it in block_dram_region instead.
+
+    // Metadata DRAM regions will never have TLB mappings, so we don't need to
+    // worry about TLB flushing. However, we do need to make sure they don't
+    // have any in-use entries.
+    if (region->*(&dram_region_info_t::pinned_pages) == 0) {
       region->*(&dram_region_info_t::owner) = free_enclave_id;
       result = monitor_ok;
     } else {

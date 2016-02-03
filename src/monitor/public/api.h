@@ -75,11 +75,6 @@ typedef enum {
 } api_result_t;
 
 // The amount of DRAM installed on the system.
-//
-// This API is not secured against cache timing attacks because enclaves should
-// only call it in initialization code, and the OS already knows when an
-// enclave is getting initialized, because it issues the enclave_enter() API
-// call.
 size_t dram_size();
 
 // The bits in a physical address that determine the DRAM region.
@@ -88,22 +83,26 @@ size_t dram_size();
 // the least significant bit is 1. dram_region_count() can be computed by
 // adding 1 to the shifted mask mentioned above. Therefore, no security monitor
 // calls are provided for dram_region_{count,shift}().
-//
-// This API is not secured against cache timing attacks because enclaves should
-// only call it in initialization code, and the OS already knows when an
-// enclave is getting initialized, because it issues the enclave_enter() API
-// call.
 size_t dram_region_mask();
+
+// Number of addressable metadata pages in a DRAM metadata region.
+//
+// This may be smaller than the number of total pages in a DRAM region, if the
+// computer does not have continuous DRAM regions and the security monitor does
+// not support using non-continuous regions.
+size_t metadata_region_pages();
+
+// The first usable metadata page in a DRAM metadata region.
+//
+// The beginning of each DRAM metadata region is reserved for the monitor's
+// use. This returns the first page number that can be used to store
+// enclave_info_t and thread_info_t structures.
+size_t metadata_region_start();
 
 // Locks a DRAM region that was previously owned by the caller.
 //
 // Enclaves calling this API are responsible for wiping any confidential
 // information from the relinquished DRAM region.
-//
-// This API is not secured against cache timing attacks because enclaves should
-// only call it when the OS asks them to relinquish a DRAM region, so the OS
-// already knows that the call will occur, and knows what DRAM region will be
-// locked.
 api_result_t block_dram_region(size_t dram_region);
 
 // The number of pages used by a hardware thread metadata.
@@ -111,9 +110,6 @@ api_result_t block_dram_region(size_t dram_region);
 // The metadata area starts with a thread_info_t structure. The rest of it is
 // used for monitor implementation-specific data.
 size_t thread_info_pages();
-
-// The number of pages used by the enclave attestation process.
-size_t attestation_area_pages();
 
 namespace enclave {  // sanctum::api::enclave
 
@@ -204,7 +200,7 @@ enclave_id_t dram_region_owner(size_t dram_region);
 // 0 means that the DRAM region will be assigned to the OS.
 //
 // Before issuing this call, the OS is responsible for wiping confidential
-// information from DRAM the region, if it was previously assigned to the OS.
+// information from the DRAM region, if it was previously assigned to the OS.
 // The OS is not responsible for wiping enclave-owned DRAM regions.
 api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner);
 
@@ -213,6 +209,16 @@ api_result_t free_dram_region(size_t dram_region);
 
 // Performs the TLB flush needed to free a locked region.
 api_result_t dram_region_flush();
+
+// Reserves a free DRAM region to hold enclave metadata.
+//
+// Before issuing this call, the OS is responsible for wiping confidential
+// information from the DRAM region, if it was previously assigned to the OS.
+// The OS is not responsible for wiping enclave-owned DRAM regions.
+//
+// DRAM regions that hold enclave metadata can be freed directly by calling
+// free_dram_region(). Calling block_dram_region() on them will fail.
+api_result_t create_metadata_region(size_t dram_region);
 
 // Creates an enclave using the given free DRAM region.
 //

@@ -15,6 +15,7 @@ using sanctum::bare::page_table_shift;
 using sanctum::bare::page_table_entry_shift;
 using sanctum::bare::page_table_entry_target;
 using sanctum::bare::page_table_translated_bits;
+using sanctum::bare::pages_needed_for;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 
@@ -58,8 +59,7 @@ inline size_t enclave_metadata_size(size_t max_threads) {
 // data. The monitor pages are at the beginning of the enclave's main DRAM
 // region.
 inline size_t enclave_metadata_pages(size_t max_threads) {
-  return (enclave_metadata_size(max_threads) + page_size() - 1)
-      >> page_shift();
+  return pages_needed_for(enclave_metadata_size(max_threads));
 }
 
 // Sets a bit in a DRAM region bitmap.

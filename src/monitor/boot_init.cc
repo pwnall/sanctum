@@ -4,7 +4,9 @@
 #include "bare/memory.h"
 #include "cpu_core.h"
 #include "dram_regions.h"
+#include "dram_regions_inl.h"
 #include "enclave.h"
+#include "metadata_inl.h"
 
 using sanctum::api::null_enclave_id;
 using sanctum::api::os::dram_region_owned;
@@ -14,6 +16,8 @@ using sanctum::bare::address_bits_for;
 using sanctum::bare::ceil_power_of_two;
 using sanctum::bare::is_shared_cache;
 using sanctum::bare::page_shift;
+using sanctum::bare::page_size;
+using sanctum::bare::pages_needed_for;
 using sanctum::bare::read_cache_levels;
 using sanctum::bare::read_cache_line_size;
 using sanctum::bare::read_cache_set_count;
@@ -32,7 +36,7 @@ using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 
 namespace sanctum {
-namespace internal {
+namespace internal {  // sanctum::internal
 
 uintptr_t g_monitor_top;
 
@@ -127,6 +131,14 @@ void boot_init_dynamic_arrays() {
   g_monitor_top = uintptr_t(g_os_region_bitmap + g_dram_region_bitmap_words);
   for (size_t i = 0; i < g_dram_region_count; ++i)
     set_bitmap_bit(g_os_region_bitmap, i, 1);
+}
+
+void boot_init_metadata() {
+  g_metadata_region_pages = g_dram_stripe_size >> page_shift();
+
+  // NOTE: relying on the compiler to optimize multiplication to bitwise shift
+  size_t metadata_map_size = g_dram_stripe_size * sizeof(metadata_page_info_t);
+  g_metadata_region_start = pages_needed_for(metadata_map_size);
 }
 
 void boot_init_protection() {

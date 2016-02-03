@@ -6,8 +6,10 @@ using sanctum::bare::address_bits_for;
 using sanctum::bare::ceil_power_of_two;
 using sanctum::bare::is_aligned_to_mask;
 using sanctum::bare::is_page_aligned;
+using sanctum::bare::is_power_of_two;
 using sanctum::bare::is_valid_range;
 using sanctum::bare::is_valid_range_mask;
+using sanctum::bare::pages_needed_for;
 using sanctum::bare::phys_ptr;
 using sanctum::bare::read_bitmap_bit;
 using sanctum::bare::reverse_bytes;
@@ -65,6 +67,21 @@ TEST(BitMaskingTest, IsPageAligned) {
   ASSERT_EQ(false, is_page_aligned(0x7000));
 }
 
+TEST(BitMaskingTest, PagesNeededFor) {
+  ASSERT_EQ(0, pages_needed_for(0));
+  ASSERT_EQ(1, pages_needed_for(1));
+  ASSERT_EQ(1, pages_needed_for(0x1800));
+  ASSERT_EQ(1, pages_needed_for(0x1FFF));
+  ASSERT_EQ(1, pages_needed_for(0x2000));
+  ASSERT_EQ(2, pages_needed_for(0x2001));
+  ASSERT_EQ(2, pages_needed_for(0x3FFF));
+  ASSERT_EQ(2, pages_needed_for(0x4000));
+  ASSERT_EQ(3, pages_needed_for(0x4001));
+  ASSERT_EQ(8, pages_needed_for(65535));
+  ASSERT_EQ(8, pages_needed_for(65536));
+  ASSERT_EQ(9, pages_needed_for(65537));
+}
+
 TEST(BitMaskingTest, AddressBitsFor) {
   ASSERT_EQ(0, address_bits_for(1));
   ASSERT_EQ(1, address_bits_for(2));
@@ -91,6 +108,22 @@ TEST(BitMaskingTest, CeilPowerOfTwo) {
   ASSERT_EQ(65536, ceil_power_of_two(65536));
 }
 
+TEST(BitMaskingTest, IsPowerOfTwo) {
+  static_assert(true == is_power_of_two(1), "is_power_of_two(1)");
+  static_assert(true == is_power_of_two(2), "is_power_of_two(2)");
+  static_assert(false == is_power_of_two(3), "is_power_of_two(3)");
+  static_assert(true == is_power_of_two(4), "is_power_of_two(4)");
+  static_assert(false == is_power_of_two(5), "is_power_of_two(5)");
+  static_assert(false == is_power_of_two(6), "is_power_of_two(6)");
+  static_assert(false == is_power_of_two(7), "is_power_of_two(7)");
+  static_assert(true == is_power_of_two(8), "is_power_of_two(8)");
+  static_assert(false == is_power_of_two(9), "is_power_of_two(9)");
+  static_assert(false == is_power_of_two(15), "is_power_of_two(15)");
+  static_assert(true == is_power_of_two(16), "is_power_of_two(16)");
+  static_assert(false == is_power_of_two(17), "is_power_of_two(17)");
+  static_assert(false == is_power_of_two(65535), "is_power_of_two(65535)");
+  static_assert(true == is_power_of_two(65536), "is_power_of_two(65536)");
+}
 
 TEST(BitMaskingTest, ReverseBytes) {
   ASSERT_EQ(0xff000000U, reverse_bytes(0xffU));

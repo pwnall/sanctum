@@ -43,6 +43,7 @@ using sanctum::internal::init_enclave_hash;
 using sanctum::internal::is_dram_address;
 using sanctum::internal::is_enclave_metadata_address;
 using sanctum::internal::is_enclave_virtual_address;
+using sanctum::internal::is_valid_dram_region;
 using sanctum::internal::is_valid_enclave_id;
 using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::read_enclave_region_bitmap_bit;
@@ -71,6 +72,9 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
   size_t metadata_pages = enclave_metadata_pages(max_threads);
   if (metadata_size > g_dram_stripe_size)
     return null_enclave_id;  // monitor_unsupported
+
+  if (!is_valid_dram_region(dram_region))
+    return null_enclave_id; // monitor_invalid_value
 
   enclave_id_t enclave_id{dram_region_start(dram_region)};
   phys_ptr<enclave_info_t> enclave_info{enclave_id};

@@ -88,8 +88,11 @@ extern size_t g_dma_range_end;
 // The enclave ID used as the owner of a blocked DRAM region.
 constexpr enclave_id_t blocked_enclave_id = 1;
 
+// The enclave ID used as the owner of a metadata DRAM region.
+constexpr enclave_id_t metadata_enclave_id = 2;
+
 // The enclave ID used as the owner of a free DRAM region.
-constexpr enclave_id_t free_enclave_id = 2;
+constexpr enclave_id_t free_enclave_id = 3;
 
 };  // namespace sanctum::internal
 };  // namespace sanctum

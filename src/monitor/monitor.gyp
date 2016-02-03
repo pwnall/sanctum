@@ -17,6 +17,9 @@
       'enclave.h',
       'enclave_init.cc',
       'enclave_inl.h',
+      'metadata.cc',
+      'metadata.h',
+      'metadata_inl.h',
       'public/api.h',
     ],
   },
@@ -50,6 +53,7 @@
       'type': 'executable',
       'sources': [
         '<@(monitor_sources)',
+        'metadata_inl_test.cc',
       ],
       'dependencies': [
         '../bare/bare.gyp:bare_testing',

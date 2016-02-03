@@ -8,7 +8,7 @@
 #include "dram_regions.h"
 
 namespace sanctum {
-namespace internal {
+namespace internal {  // sanctum::internal
 
 using sanctum::api::enclave_id_t;
 using sanctum::api::null_enclave_id;

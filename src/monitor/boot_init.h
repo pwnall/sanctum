@@ -27,6 +27,11 @@ void boot_init_dram_regions();
 // constants are set.
 void boot_init_dynamic_arrays();
 
+// Sets up enclave metadata.
+//
+// This computes the constants related to enclave metadata DRAM regions.
+void boot_init_metadata();
+
 // Sets up the hardware registers needed to protect the monitor from the OS.
 //
 // This must be called after all the monitor's memory is allocated.

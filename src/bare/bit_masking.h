@@ -36,6 +36,11 @@ constexpr inline bool is_page_aligned(uintptr_t address) {
   return is_aligned_to_mask(address, page_size() - 1);
 }
 
+// The smallest number of pages needed to store an amount of memory.
+constexpr inline size_t pages_needed_for(size_t memory_size) {
+  return (memory_size + page_size() - 1) >> page_shift();
+}
+
 // The number of bits needed to represent a quantity.
 //
 // This is 1 + the position of the most significant 1 bit in the number.
@@ -53,6 +58,11 @@ inline size_t address_bits_for(size_t memory_size) {
 // The smallest power of two that is greater or equal to a quantity.
 inline size_t ceil_power_of_two(size_t memory_size) {
   return 1 << address_bits_for(memory_size);
+}
+
+// True if the argument is a power of two.
+inline constexpr bool is_power_of_two(size_t memory_size) {
+  return memory_size > 0 && is_valid_range_mask(memory_size - 1);
 }
 
 // Sets or clears a bit in a bitmap.
