@@ -20,7 +20,7 @@ using sanctum::bare::uintptr_t;
 using sanctum::crypto::hash_block_size;
 using sanctum::crypto::hash_state_t;
 
-// Extended version of thred_info_t.
+// Extended version of thread_info_t.
 struct thread_private_info_t {
   // The public thread_info_t must be at the beginning of the structure.
   thread_info_t thread_info;
@@ -34,6 +34,23 @@ struct thread_private_info_t {
 struct thread_slot_t {
   phys_ptr<thread_private_info_t> thread_info;
   atomic_flag lock;
+};
+
+// Secure inter-enclave communication.
+struct mailbox_t {
+  atomic_flag lock;
+  size_t state;
+
+  // The OS-assigned enclave ID of the expected sender.
+  //
+  // This is necessary to prevent a malicious enclave from DoSing other
+  // enclaves in the system by spamming their mailboxes. The sender should not
+  // be trusted on its own.
+  enclave_id_t sender_id;
+  // The measurement of the expected sender.
+  //
+  // This
+  hash_state_t sender_hash;  //
 };
 
 // Per-enclave accounting information.
@@ -50,14 +67,17 @@ struct enclave_info_t {
   // Thread IDs are between 1 and max_threads.
   size_t max_threads;
 
+  // Number of mailbox_t structures following the thread_slot_t structures.
+  size_t mailbox_count;
+
   // The base of the enclave's virtual address range.
   uintptr_t ev_base;
 
   // The mask of the enclave's virtual address range.
   uintptr_t ev_mask;
 
-  // The mask for the enclave's protected address range.
-  uintptr_t epar_mask;
+  // Pointer to the first mailbox.
+  phys_ptr<mailbox_t> mailboxes;
 
   // non-zero when the enclave was initialized and can execute threads.
   // NOTE: this isn't bool because we don't want to specialize phys_ptr<bool>.

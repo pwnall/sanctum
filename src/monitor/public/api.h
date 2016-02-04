@@ -21,6 +21,9 @@ constexpr enclave_id_t null_enclave_id = 0;
 // A thread ID is the index of the thread's info structure pointer in an array.
 typedef size_t thread_id_t;
 
+// A mailbox ID is the index of the mailbox's structure pointer in an array.
+typedef size_t mailbox_id_t;
+
 // Error codes returned from monitor API calls.
 typedef enum {
   // API call succeeded.
@@ -134,14 +137,36 @@ api_result_t delete_enclave_thread(thread_id_t thread_id);
 // Ends the currently running enclave thread and returns control to the OS.
 api_result_t exit_enclave();
 
-// Performs enclave attestation.
+// Reads the monitor's private attestation key.
 //
-// The calling thread must be the only hardware thread running inside the
-// enclave.
+// This API call will only succeed if the calling enclave is the special
+// enclave designated by the security monitor to be the signing enclave.
 //
-// `phys_addr` must point into a buffer of attestation_area_pages() pages
-// contained in DRAM regions that belong to the enclave.
-api_result_t attest_enclave(uintptr_t phys_addr);
+// `phys_addr` must point into a buffer large enough to store the attestation
+// key. The entire buffer must be contained in a single DRAM region that
+// belongs to the enclave.
+api_result_t get_attestation_key(uintptr_t phys_addr);
+
+// Prepares a mailbox to receive a message from another enclave.
+//
+// The mailbox will discard any message that it might contain.
+//
+// `phys_addr` must point into a buffer large enough to store mailbox_address_t
+// key. The entire buffer must be contained in a single DRAM region that
+// belongs to the enclave.
+api_result_t accept_message(mailbox_id_t mailbox_id, uintptr_t phys_addr);
+
+// Attempts to read a message received in a mailbox.
+//
+// If the read succeeds, the mailbox will transition into the free state.
+//
+// `phys_addr` must point into a buffer large enough to store mailbox_address_t
+// key. The entire buffer must be contained in a single DRAM region that
+// belongs to the enclave.
+api_result_t read_message(mailbox_id_t mailbox_id, uintptr_t phys_addr);
+
+api_result_t send_message(uintptr_t phys_addr);
+
 
 // Enclave-supplied metadata for each hardware thread in an enclave.
 //
@@ -164,6 +189,21 @@ typedef struct {
 
   //enclave_exit_state_t exit_state;
 } thread_info_t;
+
+//
+typedef struct {
+  // The enclave ID is supplied by the OS.
+  //
+  // This untrusted ID is used to distinguish between multiple instances of the
+  // same enclave.
+  enclave_id_t enclave_id;
+
+  // The enclave's measurement.
+  //
+  // This ensures that the identity of the enclave on the other side is as
+  // expected.
+  uint8_t enclave_hash[64];
+} mailbox_address_t;
 
 };  // namespace sanctum::api::enclave
 
