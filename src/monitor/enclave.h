@@ -10,7 +10,7 @@
 namespace sanctum {
 namespace internal {
 
-using sanctum::api::enclave::thread_info_t;
+using sanctum::api::enclave::thread_public_info_t;
 using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
 using sanctum::bare::phys_ptr;
@@ -20,20 +20,14 @@ using sanctum::bare::uintptr_t;
 using sanctum::crypto::hash_block_size;
 using sanctum::crypto::hash_state_t;
 
-// Extended version of thread_info_t.
+// Extended version of thread_public_info_t.
 struct thread_private_info_t {
-  // The public thread_info_t must be at the beginning of the structure.
-  thread_info_t thread_info;
+  // The public thread_public_info_t must be at the beginning of the structure.
+  thread_public_info_t public_info;
 
   register_state_t exit_state;  // enter_enclave caller state
   register_state_t aex_state;   // enclave state saved on AEX
   size_t can_resume;            // true if the AEX state is valid
-};
-
-// Pointers to threads.
-struct thread_slot_t {
-  phys_ptr<thread_private_info_t> thread_info;
-  atomic_flag lock;
 };
 
 // Secure inter-enclave communication.
@@ -62,22 +56,14 @@ struct mailbox_t {
 //
 // This is synchronized by the lock of the enclave's main DRAM region.
 struct enclave_info_t {
-  // Number of thread_slot_t structures following the enclave_info_t.
-  //
-  // Thread IDs are between 1 and max_threads.
-  size_t max_threads;
-
-  // Number of mailbox_t structures following the thread_slot_t structures.
-  size_t mailbox_count;
-
   // The base of the enclave's virtual address range.
   uintptr_t ev_base;
 
   // The mask of the enclave's virtual address range.
   uintptr_t ev_mask;
 
-  // Pointer to the first mailbox.
-  phys_ptr<mailbox_t> mailboxes;
+  // Number of mailbox_t structures following the thread_slot_t structures.
+  size_t mailbox_count;
 
   // non-zero when the enclave was initialized and can execute threads.
   // NOTE: this isn't bool because we don't want to specialize phys_ptr<bool>.
@@ -85,9 +71,6 @@ struct enclave_info_t {
 
   // non-zero for debug enclaves.
   size_t is_debug;
-
-  // The end of the monitor metadata area at the beginning of the enclave.
-  uintptr_t metadata_top;
 
   // Physical address of the enclave's page table base during loading.
   //

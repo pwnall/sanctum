@@ -53,6 +53,8 @@
       'type': 'executable',
       'sources': [
         '<@(monitor_sources)',
+        'dram_regions_inl_test.cc',
+        'enclave_inl_test.cc',
         'metadata_inl_test.cc',
       ],
       'dependencies': [

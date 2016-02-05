@@ -29,7 +29,7 @@ constexpr metadata_page_info_t empty_metadata_page_type = 0;
 // Type for metadata pages that hold an enclave's enclave_info_t.
 constexpr metadata_page_info_t enclave_info_metadata_page_type = 1;
 
-// Type for metadata pages that hold a thread_info_t for an enclave.
+// Type for metadata pages that hold a thread_public_info_t for an enclave.
 constexpr metadata_page_info_t thread_info_metadata_page_type = 2;
 
 // Bit that distinguishes between the first page in a structure and other

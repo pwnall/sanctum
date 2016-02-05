@@ -48,7 +48,7 @@ using sanctum::internal::is_valid_enclave_id;
 using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::read_enclave_region_bitmap_bit;
 using sanctum::internal::test_and_set_dram_region_lock;
-using sanctum::internal::thread_info_t;
+using sanctum::internal::thread_public_info_t;
 using sanctum::internal::thread_private_info_pages;
 using sanctum::internal::thread_private_info_size;
 using sanctum::internal::thread_private_info_t;
@@ -60,30 +60,37 @@ namespace sanctum {
 namespace api {  // sanctum::api
 namespace os {  // sancum::api::os
 
-enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
-    uintptr_t ev_mask, size_t max_threads) {
+api_result_t create_enclave(enclave_id_t enclave_id, uintptr_t ev_base,
+    uintptr_t ev_mask, size_t mailbox_count, bool debug) {
   if (!is_valid_range(ev_base, ev_mask))
-    return null_enclave_id;  // monitor_invalid_value
+    return  monitor_invalid_value;
   if (ev_mask + 1 < page_size())
-    return null_enclave_id;  // monitor_invalid_value
+    return monitor_invalid_value;
 
-  // The enclave's metadata area must not cross DRAM regions.
-  size_t metadata_size = enclave_metadata_size(max_threads);
-  size_t metadata_pages = enclave_metadata_pages(max_threads);
-  if (metadata_size > g_dram_stripe_size)
-    return null_enclave_id;  // monitor_unsupported
-
+  size_t dram_region = dram_region_for(enclave_id);
   if (!is_valid_dram_region(dram_region))
-    return null_enclave_id; // monitor_invalid_value
-
-  enclave_id_t enclave_id{dram_region_start(dram_region)};
-  phys_ptr<enclave_info_t> enclave_info{enclave_id};
-  phys_ptr<thread_slot_t> thread_slots{enclave_thread_slots(enclave_id)};
+    return monitor_invalid_value;
 
   if (test_and_set_dram_region_lock(dram_region))
     return monitor_concurrent_call;
 
-  if (read_dram_region_owner(dram_region) == free_enclave_id) {
+  phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  phys_ptr<mailbox_t> mailboxes{enclave_mailboxes(enclave_id)};
+
+  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
+  if (region->*(&dram_region_info_t::owner) != free_enclave_id) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_state;
+  }
+
+  // The enclave's metadata area must not cross DRAM regions.
+  size_t metadata_pages = enclave_metadata_pages(max_threads);
+  phys_ptr<metadata_page_info_t> page_map_entry
+  bool found_free_pages = true;
+  for (size_t i = 0; i < metadata_pages; i += 1) {
+
+  }
+
     phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
     region->*(&dram_region_info_t::owner) = enclave_id;
     region->*(&dram_region_info_t::pinned_pages) = metadata_pages;
@@ -91,7 +98,7 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
     enclave_info->*(&enclave_info_t::max_threads) = max_threads;
     for (size_t i = 0; i < max_threads; ++i) {
       phys_ptr<thread_slot_t> slot = &thread_slots[i];
-      slot->*(&thread_slot_t::thread_info) =
+      slot->*(&thread_slot_t::thread_public_info) =
           phys_ptr<thread_private_info_t>::null();
       atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     }
@@ -102,31 +109,22 @@ enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
     enclave_info->*(&enclave_info_t::ev_mask) = ev_mask;
     enclave_info->*(&enclave_info_t::is_initialized) = 0;
 
-    // NOTE: the enclave's monitor metadata area is protected by a range
-    //       register in the address translation, so its size must be a power
-    //       of two
-    size_t metadata_size = ceil_power_of_two(metadata_pages << page_shift());
-    enclave_info->*(&enclave_info_t::metadata_top) =
-        enclave_id + metadata_size;
-    enclave_info->*(&enclave_info_t::epar_mask) =
-        ~(static_cast<uintptr_t>(metadata_size) - 1);
-
-    // NOTE: it is safe to use 0 as the initial values here because that
+    // NOTE: It is safe to use 0 as the initial values here because that
     //       physical address is in DRAM region 0, which can never be assigned
-    //       to an enclave
+    //       to an enclave.
     enclave_info->*(&enclave_info_t::load_eptbr) = 0;
     enclave_info->*(&enclave_info_t::last_load_addr) = 0;
 
     atomic_init(&(enclave_info->*(&enclave_info_t::running_threads)),
         static_cast<size_t>(0));
 
-    init_enclave_hash(enclave_info, ev_base, ev_mask, max_threads);
+    init_enclave_hash(enclave_info, ev_base, ev_mask, mailbox_count);
   } else {
     enclave_id = null_enclave_id;  // monitor_invalid_state
   }
 
   clear_dram_region_lock(dram_region);
-  return enclave_id;
+  return monitor_ok;
 }
 
 api_result_t load_enclave_page_table(enclave_id_t enclave_id,
@@ -327,7 +325,7 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
     return monitor_invalid_value;
   }
 
-  // The address of the last byte of the private_thread_info_t structure.
+  // The address of the last byte of the private_thread_public_info_t structure.
   uintptr_t virtual_end = virtual_addr + thread_private_info_size();
 
   // NOTE: the enclave virtual address range is continunous, so we can get away
@@ -399,7 +397,7 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
   }
 
   phys_ptr<thread_private_info_t> old_thread =
-      slot->*(&thread_slot_t::thread_info);
+      slot->*(&thread_slot_t::thread_public_info);
   if (old_thread != phys_ptr<thread_private_info_t>::null()) {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
@@ -425,13 +423,13 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
       thread_private_info_pages();
 
   phys_ptr<thread_private_info_t> private_thread{phys_addr};
-  slot->*(&thread_slot_t::thread_info) = private_thread;
+  slot->*(&thread_slot_t::thread_public_info) = private_thread;
 
-  // NOTE: We're writing physical address fields in the thread_info_t because
+  // NOTE: We're writing physical address fields in the thread_public_info_t because
   //       we don't want them included in the enclave's measurement, so we
   //       can't have the OS set them in the load_enclave_page() data.
-  phys_ptr<thread_info_t> thread{phys_addr};
-  thread->*(&thread_info_t::eptbr) = ptb;
+  phys_ptr<thread_public_info_t> thread{phys_addr};
+  thread->*(&thread_public_info_t::eptbr) = ptb;
 
   extend_enclave_hash_with_thread(enclave_info, thread_id, virtual_addr);
 

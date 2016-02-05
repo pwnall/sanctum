@@ -14,7 +14,7 @@ using sanctum::api::monitor_concurrent_call;
 using sanctum::api::monitor_invalid_state;
 using sanctum::api::monitor_invalid_value;
 using sanctum::api::enclave_id_t;
-using sanctum::api::enclave::thread_info_t;
+using sanctum::api::enclave::thread_public_info_t;
 using sanctum::api::os::dram_region_free;
 using sanctum::api::os::dram_region_owned;
 using sanctum::api::thread_id_t;
@@ -53,7 +53,6 @@ using sanctum::internal::is_valid_enclave_id;
 using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::read_enclave_region_bitmap_bit;
 using sanctum::internal::test_and_set_dram_region_lock;
-using sanctum::internal::thread_private_info_pages;
 using sanctum::internal::thread_private_info_size;
 using sanctum::internal::thread_private_info_t;
 using sanctum::internal::thread_slot_t;
@@ -64,20 +63,6 @@ namespace internal {  // sanctum::internal
 phys_ptr<size_t> g_os_region_bitmap{0};
 
 };  // namespace sanctum::internal
-};  // namespace sanctum
-
-namespace sanctum {
-namespace api {  // sanctum::api
-
-size_t thread_info_pages() {
-  return thread_private_info_pages();
-}
-
-size_t attestation_area_pages() {
-  return enclave_attestation_pages();
-}
-
-};  // namespace sanctum::api
 };  // namespace sanctum
 
 namespace sanctum {
@@ -187,7 +172,7 @@ api_result_t enter_enclave(enclave_id_t enclave_id,
   }
 
   phys_ptr<thread_private_info_t> private_thread =
-      slot->*(&thread_slot_t::thread_info);
+      slot->*(&thread_slot_t::thread_public_info);
   if (private_thread == phys_ptr<thread_private_info_t>::null()) {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
@@ -202,8 +187,8 @@ api_result_t enter_enclave(enclave_id_t enclave_id,
   core->*(&core_info_t::enclave_id) = enclave_id;
   core->*(&core_info_t::thread_id) = thread_id;
   core->*(&core_info_t::thread) = private_thread;
-  phys_ptr<thread_info_t> thread{
-      &(private_thread->*(&thread_private_info_t::thread_info))};
+  phys_ptr<thread_public_info_t> thread{
+      &(private_thread->*(&thread_private_info_t::public_info))};
   set_ev_base(enclave_info->*(&enclave_info_t::ev_base));
   set_ev_mask(enclave_info->*(&enclave_info_t::ev_mask));
   set_epar_base(uintptr_t(enclave_info));
@@ -211,7 +196,7 @@ api_result_t enter_enclave(enclave_id_t enclave_id,
   // TODO: set the permissions mask to allow reads
   set_epar_pmask(0);
   set_edrb_map(uintptr_t(enclave_region_bitmap(enclave_id)));
-  set_eptbr(thread->*(&thread_info_t::eptbr));
+  set_eptbr(thread->*(&thread_public_info_t::eptbr));
 
   // TODO: set the hypervisor and OS handler addresses to monitor functions
   //       that fault if the enclave attempts to perform syscalls or hypercalls
@@ -346,7 +331,7 @@ api_result_t create_enclave_thread(thread_id_t thread_id,
   }
 
   phys_ptr<thread_private_info_t> old_thread =
-      slot->*(&thread_slot_t::thread_info);
+      slot->*(&thread_slot_t::thread_public_info);
   if (old_thread != phys_ptr<thread_private_info_t>::null()) {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
@@ -372,7 +357,7 @@ api_result_t create_enclave_thread(thread_id_t thread_id,
       thread_private_info_pages();
 
   phys_ptr<thread_private_info_t> private_thread{phys_addr};
-  slot->*(&thread_slot_t::thread_info) = private_thread;
+  slot->*(&thread_slot_t::thread_public_info) = private_thread;
 
   if (thread_dram_region != dram_region)
     clear_dram_region_lock(thread_dram_region);
@@ -394,7 +379,7 @@ api_result_t delete_enclave_thread(thread_id_t thread_id) {
   }
 
   phys_ptr<thread_private_info_t> thread =
-      slot->*(&thread_slot_t::thread_info);
+      slot->*(&thread_slot_t::thread_public_info);
   if (thread == phys_ptr<thread_private_info_t>::null()) {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
@@ -418,7 +403,7 @@ api_result_t delete_enclave_thread(thread_id_t thread_id) {
   thread_region->*(&dram_region_info_t::pinned_pages) -=
       thread_private_info_pages();
 
-  slot->*(&thread_slot_t::thread_info) =
+  slot->*(&thread_slot_t::thread_public_info) =
       phys_ptr<thread_private_info_t>::null();
 
   if (thread_dram_region != dram_region)

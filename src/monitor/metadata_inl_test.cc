@@ -4,12 +4,11 @@
 
 #include "gtest/gtest.h"
 
-using sanctum::bare::
 using sanctum::internal::empty_metadata_page_type;
 using sanctum::internal::enclave_info_metadata_page_type;
 using sanctum::internal::metadata_page_info_t;
 using sanctum::internal::metadata_page_start_mask;
-using sanctum::internal::thread_info_metadata_page_type;
+using sanctum::internal::thread_public_info_metadata_page_type;
 
 
 TEST(MetadataPageInfo, SizeAndMasks) {

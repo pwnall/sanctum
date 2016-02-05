@@ -18,10 +18,10 @@ namespace api {
 typedef uintptr_t enclave_id_t;
 constexpr enclave_id_t null_enclave_id = 0;
 
-// A thread ID is the index of the thread's info structure pointer in an array.
-typedef size_t thread_id_t;
+// A thread ID is the physial address of the thread's info structure.
+typedef uintptr_t thread_id_t;
 
-// A mailbox ID is the index of the mailbox's structure pointer in an array.
+// A mailbox ID is the index of the mailbox's structure in an array.
 typedef size_t mailbox_id_t;
 
 // Error codes returned from monitor API calls.
@@ -88,31 +88,11 @@ size_t dram_size();
 // calls are provided for dram_region_{count,shift}().
 size_t dram_region_mask();
 
-// Number of addressable metadata pages in a DRAM metadata region.
-//
-// This may be smaller than the number of total pages in a DRAM region, if the
-// computer does not have continuous DRAM regions and the security monitor does
-// not support using non-continuous regions.
-size_t metadata_region_pages();
-
-// The first usable metadata page in a DRAM metadata region.
-//
-// The beginning of each DRAM metadata region is reserved for the monitor's
-// use. This returns the first page number that can be used to store
-// enclave_info_t and thread_info_t structures.
-size_t metadata_region_start();
-
 // Locks a DRAM region that was previously owned by the caller.
 //
 // Enclaves calling this API are responsible for wiping any confidential
 // information from the relinquished DRAM region.
 api_result_t block_dram_region(size_t dram_region);
-
-// The number of pages used by a hardware thread metadata.
-//
-// The metadata area starts with a thread_info_t structure. The rest of it is
-// used for monitor implementation-specific data.
-size_t thread_info_pages();
 
 namespace enclave {  // sanctum::api::enclave
 
@@ -125,7 +105,7 @@ api_result_t dram_region_check_ownership(size_t dram_region);
 // Allocates a thread info slot.
 //
 // `phys_addr` is the physical address of a range of pages that will hold the
-// thread_info_t structure. The address must be page-aligned, and must not
+// thread_public_info_t structure. The address must be page-aligned, and must not
 // overlap with the pages used by the monitor.
 api_result_t create_enclave_thread(thread_id_t thread_id, uintptr_t phys_addr);
 
@@ -151,22 +131,32 @@ api_result_t get_attestation_key(uintptr_t phys_addr);
 //
 // The mailbox will discard any message that it might contain.
 //
-// `phys_addr` must point into a buffer large enough to store mailbox_address_t
-// key. The entire buffer must be contained in a single DRAM region that
-// belongs to the enclave.
+// `phys_addr` must point into a buffer large enough to store a
+// mailbox_identity_t structure. The entire buffer must be contained in a
+// single DRAM region that belongs to the enclave.
 api_result_t accept_message(mailbox_id_t mailbox_id, uintptr_t phys_addr);
 
 // Attempts to read a message received in a mailbox.
 //
 // If the read succeeds, the mailbox will transition into the free state.
 //
-// `phys_addr` must point into a buffer large enough to store mailbox_address_t
-// key. The entire buffer must be contained in a single DRAM region that
-// belongs to the enclave.
+// `phys_addr` must point into a buffer large enough to store a
+// mailbox_identity_t structure. The entire buffer must be contained in a
+// single DRAM region that belongs to the enclave.
 api_result_t read_message(mailbox_id_t mailbox_id, uintptr_t phys_addr);
 
-api_result_t send_message(uintptr_t phys_addr);
-
+// Sends a message to another enclave's mailbox.
+//
+// `enclave_id` and `mailbox_id` identify the destination mailbox.
+//
+// `phys_addr` must point into a buffer large enough to store a
+// mailbox_identity_t structure. The entire buffer must be contained in a
+// single DRAM region that belongs to the enclave.
+//
+// The structure contains the destination enclave's expected identity. The
+// monitor will refuse to deliver the message
+api_result_t send_message(enclave_id_t enclave_id, mailbox_id_t mailbox_id,
+    uintptr_t phys_addr);
 
 // Enclave-supplied metadata for each hardware thread in an enclave.
 //
@@ -188,7 +178,7 @@ typedef struct {
   uintptr_t eptbr;
 
   //enclave_exit_state_t exit_state;
-} thread_info_t;
+} thread_public_info_t;
 
 //
 typedef struct {
@@ -203,7 +193,7 @@ typedef struct {
   // This ensures that the identity of the enclave on the other side is as
   // expected.
   uint8_t enclave_hash[64];
-} mailbox_address_t;
+} mailbox_identity_t;
 
 };  // namespace sanctum::api::enclave
 
@@ -260,25 +250,57 @@ api_result_t dram_region_flush();
 // free_dram_region(). Calling block_dram_region() on them will fail.
 api_result_t create_metadata_region(size_t dram_region);
 
-// Creates an enclave using the given free DRAM region.
+// Number of addressable metadata pages in a DRAM metadata region.
+//
+// This may be smaller than the number of total pages in a DRAM region, if the
+// computer does not have continuous DRAM regions and the security monitor does
+// not support using non-continuous regions.
+size_t metadata_region_pages();
+
+// The first usable metadata page in a DRAM metadata region.
+//
+// The beginning of each DRAM metadata region is reserved for the monitor's
+// use. This returns the first page number that can be used to store
+// enclave_info_t and thread_public_info_t structures.
+size_t metadata_region_start();
+
+
+// The number of pages used by a thread metadata structure.
+size_t thread_metadata_pages();
+
+// The number of pages used by an enclave metadata structure.
+size_t enclave_metadata_pages(size_t mailbox_count);
+
+// Creates an enclave's metadata structure.
+//
+// `enclave_id` must be the physical address of the first page in a sequence of
+// free pages in the same DRAM metadata region. It becomes the enclave's ID
+// used for subsequent API calls. The required number of free metadata pages
+// can be obtained by calling `enclave_metadata_pages`.
 //
 // `ev_base` and `ev_mask` indicate the range of enclave virtual addresses. The
 // addresses this range get translated using the enclave page tables, and must
 // point into enclave memory.
 //
-// `max_thread_count` is the maximum number of enclave threads that can be
-// allocated. This argument directs the number of 2-pointer slots created for
-// threads. For example, on a 64-bit machine, a max_thread_count of 256 will
-// allocate 4KB of data.
+// `mailbox_count` is the number of mailboxes that the enclave will have. Valid
+// mailbox IDs for this enclave will range from 0 to mailbox_count - 1.
 //
-// `debug` is set for debug enclaves. The security monitor allows debug reads
-// and writes in debug enclaves, to facilitate testing and debugging.
+// `debug` is set for debug enclaves. A security monitor that supports
+// enclave debugging will allow debug reads and writes in debug enclaves, to
+// facilitate testing and debugging.
 //
 // All arguments become a part of the enclave's measurement.
+api_result_t create_enclave(enclave_id_t enclave_id, uintptr_t ev_base,
+    uintptr_t ev_mask, size_t mailbox_count, bool debug);
+
+// Allocates a sequence of metadata pages for a thread_public_info_t structure.
+/
+// `enclave_id` is the ID of the enclave that will own the thread structure.
 //
-// Returns an enclave ID, or null_enclave_id in case of an error.
-enclave_id_t create_enclave(size_t dram_region, uintptr_t ev_base,
-    uintptr_t ev_mask, size_t max_thread_count, bool debug);
+// `thread_id` must be the physical address of a sequence of free pages in a
+// DRAM metadata region. The number of pages required can be obtained by
+// calling
+api_result_t create_thread(enclave_id_t enclave_id, thread_id_t thread_id);
 
 // Allocates a page in the enclave's main DRAM region for page tables.
 //
@@ -319,7 +341,7 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
 // `thread_id` must be smaller than the enclave's maximum thread count, and
 // must not be used by another hardware thread.
 //
-// `virtual_addr` must point to thread_info_pages() pages of virtual memory
+// `virtual_addr` must point to thread_public_info_pages() pages of virtual memory
 // that was previously initialized by calling load_enclave_page(). The address
 // must be page-aligned.
 //
