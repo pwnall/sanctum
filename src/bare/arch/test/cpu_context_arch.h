@@ -23,7 +23,7 @@ extern size_t core_cache_index_shift[];
 extern uintptr_t core_ptbr[], core_eptbr[], core_ev_base[], core_ev_mask[];
 extern uintptr_t core_par_base[], core_epar_base[];
 extern uintptr_t core_par_mask[], core_epar_mask[];
-extern uintptr_t core_par_pmask[], core_epar_pmask[];
+extern uintptr_t core_par_emask[], core_epar_emask[];
 extern size_t core_drb_map[][max_dram_region_bitmap_words];
 extern size_t core_edrb_map[][max_dram_region_bitmap_words];
 
@@ -81,11 +81,11 @@ inline void set_epar_mask(uintptr_t value) {
 inline void set_par_mask(uintptr_t value) {
   testing::core_par_mask[current_core()] = value;
 }
-inline void set_epar_pmask(uintptr_t value) {
-  testing::core_epar_pmask[current_core()] = value;
+inline void set_epar_emask(uintptr_t value) {
+  testing::core_epar_emask[current_core()] = value;
 }
-inline void set_par_pmask(uintptr_t value) {
-  testing::core_par_pmask[current_core()] = value;
+inline void set_par_emask(uintptr_t value) {
+  testing::core_par_emask[current_core()] = value;
 }
 inline void set_ev_base(uintptr_t value) {
   testing::core_ev_base[current_core()] = value;

@@ -1,6 +1,10 @@
 #if !defined(MONITOR_ENCLAVE_INL_H_INCLUDED)
 #define MONITOR_ENCLAVE_INL_H_INCLUDED
 
+#include "bare/base_types.h"
+#include "bare/bit_masking.h"
+#include "bare/page_tables.h"
+#include "bare/phys_ptr.h"
 #include "dram_regions.h"
 #include "enclave.h"
 

@@ -294,7 +294,7 @@ api_result_t create_enclave(enclave_id_t enclave_id, uintptr_t ev_base,
     uintptr_t ev_mask, size_t mailbox_count, bool debug);
 
 // Allocates a sequence of metadata pages for a thread_public_info_t structure.
-/
+//
 // `enclave_id` is the ID of the enclave that will own the thread structure.
 //
 // `thread_id` must be the physical address of a sequence of free pages in a

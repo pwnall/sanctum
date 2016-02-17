@@ -21,7 +21,7 @@ using sanctum::crypto::hash_block_size;
 using sanctum::crypto::hash_state_t;
 
 // Extended version of thread_public_info_t.
-struct thread_private_info_t {
+struct thread_info_t {
   // The public thread_public_info_t must be at the beginning of the structure.
   thread_public_info_t public_info;
 
@@ -38,13 +38,13 @@ struct mailbox_t {
   // The OS-assigned enclave ID of the expected sender.
   //
   // This is necessary to prevent a malicious enclave from DoSing other
-  // enclaves in the system by spamming their mailboxes. The sender should not
-  // be trusted on its own.
+  // enclaves in the system by spamming their mailboxes. This enclave ID should
+  // not be trusted to identify the software inside the sender.
   enclave_id_t sender_id;
   // The measurement of the expected sender.
   //
-  // This
-  hash_state_t sender_hash;  //
+  // This is a secure identifier for the software inside the sender enclave.
+  hash_state_t sender_hash;
 };
 
 // Per-enclave accounting information.

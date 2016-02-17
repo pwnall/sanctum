@@ -31,7 +31,7 @@ using sanctum::bare::set_dmar_base;
 using sanctum::bare::set_dmar_mask;
 using sanctum::bare::set_par_base;
 using sanctum::bare::set_par_mask;
-using sanctum::bare::set_par_pmask;
+using sanctum::bare::set_par_emask;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 
@@ -151,7 +151,7 @@ void boot_init_protection() {
   //       the private attestation key. Ideally, we'd like to allow the OS to
   //       read most of the monitor. However, we only have one protection range
   //       available.
-  set_par_pmask(0);
+  set_par_emask(0);
   set_drb_map(uintptr_t(g_os_region_bitmap));
 
   if (g_monitor_top > g_dram_stripe_size)

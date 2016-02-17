@@ -14,13 +14,13 @@ using sanctum::bare::set_drb_map;
 using sanctum::bare::set_edrb_map;
 using sanctum::bare::set_epar_base;
 using sanctum::bare::set_epar_mask;
-using sanctum::bare::set_epar_pmask;
+using sanctum::bare::set_epar_emask;
 using sanctum::bare::set_eptbr;
 using sanctum::bare::set_ev_base;
 using sanctum::bare::set_ev_mask;
 using sanctum::bare::set_par_base;
 using sanctum::bare::set_par_mask;
-using sanctum::bare::set_par_pmask;
+using sanctum::bare::set_par_emask;
 using sanctum::bare::set_ptbr;
 using sanctum::testing::phys_buffer;
 using sanctum::testing::phys_buffer_size;
@@ -236,41 +236,41 @@ TEST(CpuContextTest, VirtualEparMask) {
   set_current_core(0);
 }
 
-TEST(CpuContextTest, VirtualParPmask) {
+TEST(CpuContextTest, VirtualParEmask) {
   uintptr_t value = 0xfffffe00;
 
   set_core_count(8);
 
-  set_par_pmask(value);
-  ASSERT_EQ(value, sanctum::testing::core_par_pmask[0]);
-  ASSERT_EQ(0, sanctum::testing::core_par_pmask[3]);
-  set_par_pmask(0);
-  ASSERT_EQ(0, sanctum::testing::core_par_pmask[0]);
+  set_par_emask(value);
+  ASSERT_EQ(value, sanctum::testing::core_par_emask[0]);
+  ASSERT_EQ(0, sanctum::testing::core_par_emask[3]);
+  set_par_emask(0);
+  ASSERT_EQ(0, sanctum::testing::core_par_emask[0]);
   set_current_core(3);
-  set_par_pmask(value);
-  ASSERT_EQ(0, sanctum::testing::core_par_pmask[0]);
-  ASSERT_EQ(value, sanctum::testing::core_par_pmask[3]);
-  set_par_pmask(0);
-  ASSERT_EQ(0, sanctum::testing::core_par_pmask[3]);
+  set_par_emask(value);
+  ASSERT_EQ(0, sanctum::testing::core_par_emask[0]);
+  ASSERT_EQ(value, sanctum::testing::core_par_emask[3]);
+  set_par_emask(0);
+  ASSERT_EQ(0, sanctum::testing::core_par_emask[3]);
   set_current_core(0);
 }
 
-TEST(CpuContextTest, VirtualEparPmask) {
+TEST(CpuContextTest, VirtualEparEmask) {
   uintptr_t value = 0xfffffe00;
 
   set_core_count(8);
 
-  set_epar_pmask(value);
-  ASSERT_EQ(value, sanctum::testing::core_epar_pmask[0]);
-  ASSERT_EQ(0, sanctum::testing::core_epar_pmask[3]);
-  set_epar_pmask(0);
-  ASSERT_EQ(0, sanctum::testing::core_epar_pmask[0]);
+  set_epar_emask(value);
+  ASSERT_EQ(value, sanctum::testing::core_epar_emask[0]);
+  ASSERT_EQ(0, sanctum::testing::core_epar_emask[3]);
+  set_epar_emask(0);
+  ASSERT_EQ(0, sanctum::testing::core_epar_emask[0]);
   set_current_core(3);
-  set_epar_pmask(value);
-  ASSERT_EQ(0, sanctum::testing::core_epar_pmask[0]);
-  ASSERT_EQ(value, sanctum::testing::core_epar_pmask[3]);
-  set_epar_pmask(0);
-  ASSERT_EQ(0, sanctum::testing::core_epar_pmask[3]);
+  set_epar_emask(value);
+  ASSERT_EQ(0, sanctum::testing::core_epar_emask[0]);
+  ASSERT_EQ(value, sanctum::testing::core_epar_emask[3]);
+  set_epar_emask(0);
+  ASSERT_EQ(0, sanctum::testing::core_epar_emask[3]);
   set_current_core(0);
 }
 

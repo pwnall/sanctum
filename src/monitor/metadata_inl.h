@@ -1,6 +1,9 @@
 #if !defined(MONITOR_METADATA_INL_H_INCLUDED)
 #define MONITOR_METADATA_INL_H_INCLUDED
 
+#include "bare/base_types.h"
+#include "bare/bit_masking.h"
+#include "bare/phys_ptr.h"
 #include "dram_regions.h"
 #include "enclave.h"
 #include "metadata.h"
@@ -8,7 +11,13 @@
 namespace sanctum {
 namespace internal {  // sanctum::internal
 
+using sanctum::api::null_enclave_id;
+using sanctum::bare::pages_needed_for;
 
+inline phys_ptr<metadata_page_info_t> metadata_page_info_for(
+    uintptr_t phys_addr) {
+
+}
 
 
 // Computes the physical address of an enclave's DRAM region bitmap.
@@ -39,18 +48,17 @@ inline phys_ptr<mailbox_t> enclave_mailbox(enclave_id_t enclave_id,
 //
 // This returns the precise amount of memory used by the monitor. However, all
 // metadata memory management happens at page granularity, so
-// enclave_metadata_pages() is a better reflection of the amount of DRAM
+// enclave_info_pages() is a better reflection of the amount of DRAM
 // allocated to monitor pages.
 inline size_t enclave_info_size(size_t mailbox_count) {
-  return static_cast<size_t>(uintptr_t(enclave_mailbox(0, mailbox_count));
+  return static_cast<size_t>(uintptr_t(enclave_mailbox(0, mailbox_count)));
 }
 
 // The number of pages used by the security monitor for an enclave.
 //
-// See enclave_metadata_area_size() for an explanation of the security
-// monitor's data.
+// See enclave_info_size() for an explanation of the security monitor's data.
 inline size_t enclave_info_pages(size_t mailbox_count) {
-  return pages_needed_for(enclave_metadata_size(mailbox_count));
+  return pages_needed_for(enclave_info_size(mailbox_count));
 }
 
 // The size of an enclave hardware thread's metadata, in bytes.
@@ -60,7 +68,7 @@ constexpr inline size_t thread_info_size() {
 
 // The number of pages taken by an enclave hardware thread's metadata.
 constexpr inline size_t thread_info_pages() {
-  return pages_needed_for(thread_metadata_size());
+  return pages_needed_for(thread_info_size());
 }
 
 // Sets a bit in a DRAM region bitmap.
@@ -72,8 +80,7 @@ inline void set_enclave_region_bitmap_bit(enclave_id_t enclave_id,
     size_t dram_region, bool true_for_set) {
   if (enclave_id == null_enclave_id) {
     set_bitmap_bit(g_os_region_bitmap, dram_region, true_for_set);
-  }
-  else {
+  } else {
     set_bitmap_bit(enclave_region_bitmap(enclave_id), dram_region,
         true_for_set);
   }

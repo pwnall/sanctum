@@ -17,7 +17,7 @@ using sanctum::bare::phys_ptr;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 
-struct thread_private_info_t;
+struct thread_info_t;
 
 // Per-core accounting information.
 //
@@ -28,9 +28,9 @@ struct core_info_t {
   enclave_id_t enclave_id;  // 0 if the core isn't executing enclave code
   thread_id_t thread_id;
 
-  // The DRAM backing the thread_private_info_t is guaranteed to be pinned
+  // The DRAM backing the thread_info_t is guaranteed to be pinned
   // while the thread is executing on a core.
-  phys_ptr<thread_private_info_t> thread;
+  phys_ptr<thread_info_t> thread;
 
   // The value of block_clock when this core's TLB was last flushed.
   // This is read on other cores,

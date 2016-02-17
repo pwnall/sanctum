@@ -17,6 +17,7 @@ using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
 using sanctum::bare::bzero;
 using sanctum::bare::is_valid_range;
+using sanctum::bare::page_shift;
 using sanctum::bare::phys_ptr;
 using sanctum::bare::read_bitmap_bit;
 using sanctum::bare::set_bitmap_bit;
@@ -43,6 +44,14 @@ inline size_t dram_region_for(uintptr_t address) {
 inline size_t clamped_dram_region_for(uintptr_t address) {
   size_t region = dram_region_for(address);
   return (region < g_dram_region_count) ? region : 0;
+}
+
+// Computes an address' page index inside a DRAM region.
+//
+// This only computes page numbers correctly if the address belongs to the DRAM
+// region's first stripe.
+inline size_t dram_region_page_index(uintptr_t address) {
+  return (address & ~g_dram_region_mask) >> page_shift();
 }
 
 // Acquires the lock for a DRAM region.

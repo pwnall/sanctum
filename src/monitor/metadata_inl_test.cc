@@ -4,11 +4,14 @@
 
 #include "gtest/gtest.h"
 
+using sanctum::api::enclave_id_t;
+using sanctum::bare::page_size;
 using sanctum::internal::empty_metadata_page_type;
 using sanctum::internal::enclave_info_metadata_page_type;
 using sanctum::internal::metadata_page_info_t;
 using sanctum::internal::metadata_page_start_mask;
-using sanctum::internal::thread_public_info_metadata_page_type;
+using sanctum::internal::metadata_page_type_mask;
+using sanctum::internal::thread_info_metadata_page_type;
 
 
 TEST(MetadataPageInfo, SizeAndMasks) {
@@ -24,7 +27,7 @@ TEST(MetadataPageInfo, SizeAndMasks) {
       == enclave_info_metadata_page_type,
       "metadata_page_type_mask must cover enclave_info_metadata_page_type");
   static_assert((thread_info_metadata_page_type & metadata_page_type_mask)
-      == empty_metadata_page_type,
+      == thread_info_metadata_page_type,
       "metadata_page_type_mask must cover thread_info_metadata_page_type");
 
   static_assert(metadata_page_start_mask < (page_size() - 1),

@@ -25,7 +25,7 @@ using sanctum::bare::phys_ptr;
 using sanctum::bare::set_edrb_map;
 using sanctum::bare::set_epar_base;
 using sanctum::bare::set_epar_mask;
-using sanctum::bare::set_epar_pmask;
+using sanctum::bare::set_epar_emask;
 using sanctum::bare::set_eptbr;
 using sanctum::bare::set_ev_base;
 using sanctum::bare::set_ev_mask;
@@ -54,7 +54,7 @@ using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::read_enclave_region_bitmap_bit;
 using sanctum::internal::test_and_set_dram_region_lock;
 using sanctum::internal::thread_private_info_size;
-using sanctum::internal::thread_private_info_t;
+using sanctum::internal::thread_info_t;
 using sanctum::internal::thread_slot_t;
 
 namespace sanctum {
@@ -171,9 +171,9 @@ api_result_t enter_enclave(enclave_id_t enclave_id,
     return monitor_concurrent_call;
   }
 
-  phys_ptr<thread_private_info_t> private_thread =
+  phys_ptr<thread_info_t> private_thread =
       slot->*(&thread_slot_t::thread_public_info);
-  if (private_thread == phys_ptr<thread_private_info_t>::null()) {
+  if (private_thread == phys_ptr<thread_info_t>::null()) {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
     return monitor_invalid_state;
@@ -194,7 +194,7 @@ api_result_t enter_enclave(enclave_id_t enclave_id,
   set_epar_base(uintptr_t(enclave_info));
   set_epar_mask(enclave_info->*(&enclave_info_t::epar_mask));
   // TODO: set the permissions mask to allow reads
-  set_epar_pmask(0);
+  set_epar_emask(0);
   set_edrb_map(uintptr_t(enclave_region_bitmap(enclave_id)));
   set_eptbr(thread->*(&thread_public_info_t::eptbr));
 
@@ -289,7 +289,7 @@ api_result_t create_enclave_thread(thread_id_t thread_id,
     return monitor_invalid_value;
 
   uintptr_t phys_end = phys_addr + thread_private_info_size();
-  // NOTE: The thread_private_info_t occupies contiguous space in physical
+  // NOTE: The thread_info_t occupies contiguous space in physical
   //       memory, so we only need to check the end for DRAM inclusion. The
   //       intermediate pages are guaranteed to be in DRAM.
   if (!is_dram_address(phys_end - 1))
@@ -330,9 +330,9 @@ api_result_t create_enclave_thread(thread_id_t thread_id,
     return monitor_concurrent_call;
   }
 
-  phys_ptr<thread_private_info_t> old_thread =
+  phys_ptr<thread_info_t> old_thread =
       slot->*(&thread_slot_t::thread_public_info);
-  if (old_thread != phys_ptr<thread_private_info_t>::null()) {
+  if (old_thread != phys_ptr<thread_info_t>::null()) {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
     return monitor_invalid_state;
@@ -356,7 +356,7 @@ api_result_t create_enclave_thread(thread_id_t thread_id,
   thread_region->*(&dram_region_info_t::pinned_pages) +=
       thread_private_info_pages();
 
-  phys_ptr<thread_private_info_t> private_thread{phys_addr};
+  phys_ptr<thread_info_t> private_thread{phys_addr};
   slot->*(&thread_slot_t::thread_public_info) = private_thread;
 
   if (thread_dram_region != dram_region)
@@ -378,9 +378,9 @@ api_result_t delete_enclave_thread(thread_id_t thread_id) {
     return monitor_concurrent_call;
   }
 
-  phys_ptr<thread_private_info_t> thread =
+  phys_ptr<thread_info_t> thread =
       slot->*(&thread_slot_t::thread_public_info);
-  if (thread == phys_ptr<thread_private_info_t>::null()) {
+  if (thread == phys_ptr<thread_info_t>::null()) {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
     return monitor_invalid_state;
@@ -404,7 +404,7 @@ api_result_t delete_enclave_thread(thread_id_t thread_id) {
       thread_private_info_pages();
 
   slot->*(&thread_slot_t::thread_public_info) =
-      phys_ptr<thread_private_info_t>::null();
+      phys_ptr<thread_info_t>::null();
 
   if (thread_dram_region != dram_region)
     clear_dram_region_lock(thread_dram_region);
@@ -418,7 +418,7 @@ api_result_t exit_enclave() {
 
   enclave_id_t enclave_id = core->*(&core_info_t::enclave_id);
   thread_id_t thread_id = core->*(&core_info_t::thread_id);
-  phys_ptr<thread_private_info_t> private_thread =
+  phys_ptr<thread_info_t> private_thread =
       core->*(&core_info_t::thread);
 
   phys_ptr<enclave_info_t> enclave_info{enclave_id};
@@ -433,7 +433,7 @@ api_result_t exit_enclave() {
   //       with a non-zero number.
   set_ev_base(page_size());
   set_ev_mask(0);
-  // NOTE: we don't need to reset eptbr, edrb_map and epar_{base, mask, pmask},
+  // NOTE: we don't need to reset eptbr, edrb_map and epar_{base, mask, emask},
   //       because they'll never make it out of the page walker input MUXes.
 
   atomic_fetch_sub(&(enclave_info->*(&enclave_info_t::running_threads)),

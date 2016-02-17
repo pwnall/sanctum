@@ -48,39 +48,33 @@ void set_ptbr(uintptr_t value);
 
 // Sets the EPARBASE (enclave protected address range base) register.
 //
-// This can only be issued by the security monitor. An invalid DRAM address
-// will lock up or reboot the machine.
+// This can only be issued by the security monitor.
 void set_epar_base(uintptr_t value);
 
 // Sets the PARBASE (protected address range base) register.
 //
-// This can only be issued by the security monitor. An invalid DRAM address
-// will lock up or reboot the machine.
+// This can only be issued by the security monitor.
 void set_par_base(uintptr_t value);
 
 // Sets the EPARMASK (enclave protected address range mask) register.
 //
-// This can only be issued by the security monitor. An invalid DRAM address
-// will lock up or reboot the machine.
+// This can only be issued by the security monitor.
 void set_epar_mask(uintptr_t value);
 
 // Sets the PARMASK (protected address range mask) register.
 //
-// This can only be issued by the security monitor. An invalid DRAM address
-// will lock up or reboot the machine.
+// This can only be issued by the security monitor.
 void set_par_mask(uintptr_t value);
 
-// Sets the EPARPMASK (enclave protected address range permission mask) reg.
+// Sets the EPAREMASK (enclave protected address range entry mask) register.
 //
-// This can only be issued by the security monitor. An invalid DRAM address
-// will lock up or reboot the machine.
-void set_epar_pmask(uintptr_t value);
+// This can only be issued by the security monitor.
+void set_epar_emask(uintptr_t value);
 
-// Sets the PARPMASK (protected address range permission mask) register.
+// Sets the PAREMASK (protected address range entry mask) register.
 //
-// This can only be issued by the security monitor. An invalid DRAM address
-// will lock up or reboot the machine.
-void set_par_pmask(uintptr_t value);
+// This can only be issued by the security monitor.
+void set_par_emask(uintptr_t value);
 
 // Sets the EVBASE (enclave virtual address base register).
 //
@@ -92,10 +86,10 @@ void set_ev_base(uintptr_t value);
 // This can only be issued by the security monitor.
 void set_ev_mask(uintptr_t value);
 
-// Loads the DRBMAP (DMA region bitmap) register from memory.
+// Loads the DRBMAP (DRAM region bitmap) register from memory.
 void set_drb_map(uintptr_t phys_addr);
 
-// Loads the EDRBMAP (enclave DMA region bitmap) register from memory.
+// Loads the EDRBMAP (enclave DRAM region bitmap) register from memory.
 void set_edrb_map(uintptr_t phys_addr);
 
 // The execution context saved when the monitor is invoked.
