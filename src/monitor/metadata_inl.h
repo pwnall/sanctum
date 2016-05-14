@@ -63,7 +63,7 @@ inline size_t enclave_info_pages(size_t mailbox_count) {
 
 // The size of an enclave hardware thread's metadata, in bytes.
 constexpr inline size_t thread_info_size() {
-  return sizeof(thread_info_t);
+  return sizeof(thread_metadata_t);
 }
 
 // The number of pages taken by an enclave hardware thread's metadata.

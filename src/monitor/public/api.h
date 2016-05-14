@@ -77,10 +77,10 @@ typedef enum {
   monitor_unsupported = 5,
 } api_result_t;
 
-// The amount of DRAM installed on the system.
+// Returns the amount of DRAM installed on the system.
 size_t dram_size();
 
-// The bits in a physical address that determine the DRAM region.
+// Returns the bits in a physical address that determine the DRAM region.
 //
 // dram_region_shift() can be computed by right-shifting the mask by 1 until
 // the least significant bit is 1. dram_region_count() can be computed by
@@ -105,7 +105,7 @@ api_result_t dram_region_check_ownership(size_t dram_region);
 // Allocates a thread info slot.
 //
 // `phys_addr` is the physical address of a range of pages that will hold the
-// thread_public_info_t structure. The address must be page-aligned, and must not
+// thread_info_t structure. The address must be page-aligned, and must not
 // overlap with the pages used by the monitor.
 api_result_t create_enclave_thread(thread_id_t thread_id, uintptr_t phys_addr);
 
@@ -158,10 +158,7 @@ api_result_t read_message(mailbox_id_t mailbox_id, uintptr_t phys_addr);
 api_result_t send_message(enclave_id_t enclave_id, mailbox_id_t mailbox_id,
     uintptr_t phys_addr);
 
-// Enclave-supplied metadata for each hardware thread in an enclave.
-//
-// The enclave-supplied metadata is followed by monitor implementation-specific
-// metadata, which should not be modified.
+// Enclave-supplied information used to initialize a thread's metadata.
 typedef struct {
   // The virtual address of the thread's entry point.
   void (*entry_pc)();
@@ -178,7 +175,7 @@ typedef struct {
   uintptr_t eptbr;
 
   //enclave_exit_state_t exit_state;
-} thread_public_info_t;
+} thread_info_t;
 
 //
 typedef struct {
@@ -213,12 +210,12 @@ typedef enum {
 // The range must be entirely contained in DRAM regions allocated to the OS.
 api_result_t set_dma_range(uintptr_t base, uintptr_t mask);
 
-// The state of the DRAM region with the given index.
+// Returns the state of the DRAM region with the given index.
 //
 // Returns dram_region_invalid if the given DRAM region index is invalid.
 dram_region_state_t dram_region_state(size_t dram_region);
 
-// The owner of the DRAM region with the given index.
+// Returns the owner of the DRAM region with the given index.
 //
 // Returns null_enclave_id if the given DRAM region index is invalid, or if the
 // region is not in the owned state.
@@ -250,25 +247,24 @@ api_result_t dram_region_flush();
 // free_dram_region(). Calling block_dram_region() on them will fail.
 api_result_t create_metadata_region(size_t dram_region);
 
-// Number of addressable metadata pages in a DRAM metadata region.
+// Returns the number of addressable metadata pages in a DRAM metadata region.
 //
 // This may be smaller than the number of total pages in a DRAM region, if the
 // computer does not have continuous DRAM regions and the security monitor does
 // not support using non-continuous regions.
 size_t metadata_region_pages();
 
-// The first usable metadata page in a DRAM metadata region.
+// Returns the first usable metadata page in a DRAM metadata region.
 //
 // The beginning of each DRAM metadata region is reserved for the monitor's
 // use. This returns the first page number that can be used to store
-// enclave_info_t and thread_public_info_t structures.
+// enclave_info_t and thread_metadata_t structures.
 size_t metadata_region_start();
 
-
-// The number of pages used by a thread metadata structure.
+// Returns the number of pages used by a thread metadata structure.
 size_t thread_metadata_pages();
 
-// The number of pages used by an enclave metadata structure.
+// Returns the number of pages used by an enclave metadata structure.
 size_t enclave_metadata_pages(size_t mailbox_count);
 
 // Creates an enclave's metadata structure.
@@ -293,7 +289,7 @@ size_t enclave_metadata_pages(size_t mailbox_count);
 api_result_t create_enclave(enclave_id_t enclave_id, uintptr_t ev_base,
     uintptr_t ev_mask, size_t mailbox_count, bool debug);
 
-// Allocates a sequence of metadata pages for a thread_public_info_t structure.
+// Allocates a sequence of metadata pages for a thread_info_t structure.
 //
 // `enclave_id` is the ID of the enclave that will own the thread structure.
 //
@@ -380,7 +376,7 @@ api_result_t delete_enclave(enclave_id_t enclave_id);
 // into OS memory. `enclave_addr` must point to a page in a DRAM region c
 // by the enclave, and `os_addr` must point to a page in a DRAM region owned by
 // the OS.
-api_result_t debug_enclave_copy_page(enclave_id_t enclave_id,
+api_result_t copy_debug_enclave_page(enclave_id_t enclave_id,
     uintptr_t enclave_addr, uintptr_t os_addr, bool read_from_enclave);
 
 };  // namespace sanctum::api::os

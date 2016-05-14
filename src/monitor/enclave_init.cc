@@ -48,10 +48,10 @@ using sanctum::internal::is_valid_enclave_id;
 using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::read_enclave_region_bitmap_bit;
 using sanctum::internal::test_and_set_dram_region_lock;
-using sanctum::internal::thread_public_info_t;
+using sanctum::internal::thread_info_t;
 using sanctum::internal::thread_private_info_pages;
 using sanctum::internal::thread_private_info_size;
-using sanctum::internal::thread_info_t;
+using sanctum::internal::thread_metadata_t;
 using sanctum::internal::thread_slot_t;
 using sanctum::internal::walk_page_tables;
 using sanctum::internal::walk_page_tables_to_entry;
@@ -108,7 +108,7 @@ api_result_t create_enclave(enclave_id_t enclave_id, uintptr_t ev_base,
     for (size_t i = 0; i < max_threads; ++i) {
       phys_ptr<thread_slot_t> slot = &thread_slots[i];
       slot->*(&thread_slot_t::thread_public_info) =
-          phys_ptr<thread_info_t>::null();
+          phys_ptr<thread_metadata_t>::null();
       atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     }
 
@@ -334,7 +334,7 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
     return monitor_invalid_value;
   }
 
-  // The address of the last byte of the private_thread_public_info_t structure.
+  // The address of the last byte of the private_thread_info_t structure.
   uintptr_t virtual_end = virtual_addr + thread_private_info_size();
 
   // NOTE: the enclave virtual address range is continunous, so we can get away
@@ -350,7 +350,7 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
   uintptr_t phys_addr = walk_page_tables(ptb, virtual_addr);
   uintptr_t phys_end = phys_addr + thread_private_info_size();
 
-  // NOTE: The thread_info_t occupies contiguous space in physical
+  // NOTE: The thread_metadata_t occupies contiguous space in physical
   //       memory, so we only need to check the end for DRAM inclusion. The
   //       start is guaranteed to be in DRAM, because it comes from a page walk
   //       over trusted page tables.
@@ -377,7 +377,7 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
       // don't support that, because the code would be quite complex. We'd have
       // to acquire locks for multiple DRAM regions, and release them carefully
       // if any acquisition fails. Furthermore, on most architectures,
-      // thread_info_t takes up a single page, so the extra complexity
+      // thread_metadata_t takes up a single page, so the extra complexity
       // is not warranted.
       is_supported_mapping = false;
       break;
@@ -405,9 +405,9 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
     return monitor_concurrent_call;
   }
 
-  phys_ptr<thread_info_t> old_thread =
+  phys_ptr<thread_metadata_t> old_thread =
       slot->*(&thread_slot_t::thread_public_info);
-  if (old_thread != phys_ptr<thread_info_t>::null()) {
+  if (old_thread != phys_ptr<thread_metadata_t>::null()) {
     atomic_flag_clear(&(slot->*(&thread_slot_t::lock)));
     clear_dram_region_lock(dram_region);
     return monitor_invalid_state;
@@ -431,14 +431,14 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
   thread_region->*(&dram_region_info_t::pinned_pages) +=
       thread_private_info_pages();
 
-  phys_ptr<thread_info_t> private_thread{phys_addr};
+  phys_ptr<thread_metadata_t> private_thread{phys_addr};
   slot->*(&thread_slot_t::thread_public_info) = private_thread;
 
-  // NOTE: We're writing physical address fields in the thread_public_info_t because
+  // NOTE: We're writing physical address fields in the thread_info_t because
   //       we don't want them included in the enclave's measurement, so we
   //       can't have the OS set them in the load_enclave_page() data.
-  phys_ptr<thread_public_info_t> thread{phys_addr};
-  thread->*(&thread_public_info_t::eptbr) = ptb;
+  phys_ptr<thread_info_t> thread{phys_addr};
+  thread->*(&thread_info_t::eptbr) = ptb;
 
   extend_enclave_hash_with_thread(enclave_info, thread_id, virtual_addr);
 

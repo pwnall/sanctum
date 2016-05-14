@@ -10,7 +10,7 @@
 namespace sanctum {
 namespace internal {
 
-using sanctum::api::enclave::thread_public_info_t;
+using sanctum::api::enclave::thread_info_t;
 using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
 using sanctum::bare::phys_ptr;
