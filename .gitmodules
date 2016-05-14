@@ -24,7 +24,7 @@
 	url = https://chromium.googlesource.com/chromium/llvm-project/libcxx.git
 [submodule "deps/googletest"]
 	path = deps/googletest
-	url = https://chromium.googlesource.com/external/googletest
+	url = https://github.com/google/googletest/
 [submodule "deps/cmake"]
 	path = deps/cmake
 	url = https://cmake.org/cmake.git
