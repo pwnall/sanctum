@@ -50,6 +50,11 @@ Don't stop on first error, build as much as possible.
 ./build/ninja -C out/Debug -k0
 ```
 
+### Autocomplete
+
+This project should be set up correctly to use
+[autocomplete-clang](https://atom.io/packages/autocomplete-clang).
+
 
 ## Copyright
 
