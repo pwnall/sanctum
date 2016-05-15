@@ -7,11 +7,11 @@
 using sanctum::api::enclave_id_t;
 using sanctum::bare::page_size;
 using sanctum::internal::empty_metadata_page_type;
-using sanctum::internal::enclave_info_metadata_page_type;
+using sanctum::internal::enclave_metadata_page_type;
+using sanctum::internal::inner_metadata_page_type;
 using sanctum::internal::metadata_page_info_t;
-using sanctum::internal::metadata_page_start_mask;
 using sanctum::internal::metadata_page_type_mask;
-using sanctum::internal::thread_info_metadata_page_type;
+using sanctum::internal::thread_metadata_page_type;
 
 
 TEST(MetadataPageInfo, SizeAndMasks) {
@@ -23,15 +23,13 @@ TEST(MetadataPageInfo, SizeAndMasks) {
   static_assert((empty_metadata_page_type & metadata_page_type_mask)
       == empty_metadata_page_type,
       "metadata_page_type_mask must cover empty_metadata_page_type");
-  static_assert((enclave_info_metadata_page_type & metadata_page_type_mask)
-      == enclave_info_metadata_page_type,
-      "metadata_page_type_mask must cover enclave_info_metadata_page_type");
-  static_assert((thread_info_metadata_page_type & metadata_page_type_mask)
-      == thread_info_metadata_page_type,
-      "metadata_page_type_mask must cover thread_info_metadata_page_type");
-
-  static_assert(metadata_page_start_mask < (page_size() - 1),
-      "metadata_page_start_mask must fit into untranslated address bits");
-  static_assert((metadata_page_start_mask < metadata_page_type_mask) == 0,
-      "metadata_page_start_mask and metadata_page_type_mask can't share bits");
+  static_assert((inner_metadata_page_type & metadata_page_type_mask)
+      == inner_metadata_page_type,
+      "metadata_page_type_mask must cover inner_metadata_page_type");
+  static_assert((enclave_metadata_page_type & metadata_page_type_mask)
+      == enclave_metadata_page_type,
+      "metadata_page_type_mask must cover enclave_metadata_page_type");
+  static_assert((thread_metadata_page_type & metadata_page_type_mask)
+      == thread_metadata_page_type,
+      "metadata_page_type_mask must cover thread_metadata_page_type");
 }

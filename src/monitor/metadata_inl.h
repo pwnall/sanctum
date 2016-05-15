@@ -4,34 +4,34 @@
 #include "bare/base_types.h"
 #include "bare/bit_masking.h"
 #include "bare/phys_ptr.h"
-#include "dram_regions.h"
+#include "dram_regions_inl.h"
 #include "enclave.h"
 #include "metadata.h"
 
 namespace sanctum {
 namespace internal {  // sanctum::internal
 
+using sanctum::api::mailbox_id_t;
 using sanctum::api::null_enclave_id;
 using sanctum::bare::pages_needed_for;
 
 inline phys_ptr<metadata_page_info_t> metadata_page_info_for(
     uintptr_t phys_addr) {
-
+  return phys_ptr<metadata_page_info_t>{dram_region_start(phys_addr)} +
+      dram_region_page_index(phys_addr);
 }
-
 
 // Computes the physical address of an enclave's DRAM region bitmap.
 //
 // The DRAM region bitmap has 1 bit for every DRAM region in the system. The
 // bits corresponding to DRAM regions allocated to the enclave are set to 1.
 inline phys_ptr<size_t> enclave_region_bitmap(enclave_id_t enclave_id) {
-  phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  const phys_ptr<enclave_info_t> enclave_info{enclave_id};
   return phys_ptr<size_t>{uintptr_t(enclave_info + 1)};
 }
 // Computes the physical address of an enclave's mailboxes array.
 inline phys_ptr<mailbox_t> enclave_mailboxes(enclave_id_t enclave_id) {
-  phys_ptr<enclave_info_t> enclave_info{enclave_id};
-  return phys_ptr<thread_slot_t>{uintptr_t(
+  return phys_ptr<mailbox_t>{uintptr_t(
       enclave_region_bitmap(enclave_id) + g_dram_region_bitmap_words)};
 }
 // Computes the physical address of an enclave mailbox.
@@ -62,13 +62,13 @@ inline size_t enclave_info_pages(size_t mailbox_count) {
 }
 
 // The size of an enclave hardware thread's metadata, in bytes.
-constexpr inline size_t thread_info_size() {
+constexpr inline size_t thread_metadata_size() {
   return sizeof(thread_metadata_t);
 }
 
 // The number of pages taken by an enclave hardware thread's metadata.
-constexpr inline size_t thread_info_pages() {
-  return pages_needed_for(thread_info_size());
+constexpr inline size_t thread_metadata_pages() {
+  return pages_needed_for(thread_metadata_size());
 }
 
 // Sets a bit in a DRAM region bitmap.

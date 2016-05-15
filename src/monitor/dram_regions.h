@@ -27,8 +27,9 @@ struct dram_region_info_t {
 
 // Accounting information for all DRAM regions.
 struct dram_regions_info_t {
-  // NOTE: the lock generation counter is NOT protected by a lock, because it
-  //       must be accessible in dram_region_flush(), which must be lock-free
+  // NOTE: The lock generation counter is NOT protected by a lock because it
+  //       must be accessible in flush_cached_dram_regions(), which must be
+  //       lock-free.
   atomic<size_t> block_clock;
 };
 
@@ -60,7 +61,7 @@ extern size_t g_dram_region_count;
 // contiguous and has exactly one stripe. Otherwise, the stripes alternate in
 // DRAM as follows.
 //
-// R1S1 R1S2 ... R1Sn R2S1 R2S2 ... R2Sn ... RmS1 RmS2 ... RmSn
+// R1S1 R2S1 ... RmS1 R1S2 R2S2 ... RmS2 ... R1Sn R2Sn ... RmSn
 //
 // The stripe size is always (1 << g_dram_region_shift).
 extern size_t g_dram_stripe_size;

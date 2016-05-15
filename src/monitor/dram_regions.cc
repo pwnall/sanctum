@@ -3,6 +3,7 @@
 #include "cpu_core_inl.h"
 #include "dram_regions_inl.h"
 #include "enclave_inl.h"
+#include "metadata_inl.h"
 
 using sanctum::api::null_enclave_id;
 using sanctum::bare::atomic_flag_test_and_set;
@@ -357,7 +358,7 @@ api_result_t free_dram_region(size_t dram_region) {
   return result;
 }
 
-api_result_t dram_region_flush() {
+api_result_t flush_cached_dram_regions() {
   dram_region_tlb_flush();
   return monitor_ok;
 }

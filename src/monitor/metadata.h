@@ -13,8 +13,9 @@ using sanctum::bare::uintptr_t;
 
 // The page map entry for a metadata page is packed in a single pointer.
 //
-// This is possible because each enclave ID must be a multiple of a page, so
-// the bottom bits are available.
+// This is possible because an enclave ID points to the enclave's metadata
+// page, so each enclave ID is page-aligned. This makes the bottom bits
+// available for storing accounting information.
 typedef uintptr_t metadata_page_info_t;
 
 // Mask that selects the metadata page type bits.
@@ -26,15 +27,16 @@ constexpr metadata_page_info_t metadata_page_type_mask = 3;
 // software.
 constexpr metadata_page_info_t empty_metadata_page_type = 0;
 
+// Type for metadata pages that store inner pages for data structures. The
+// first page of each data structure has a type that identifies the data
+// structure.
+constexpr metadata_page_info_t inner_metadata_page_type = 1;
+
 // Type for metadata pages that hold an enclave's enclave_info_t.
-constexpr metadata_page_info_t enclave_info_metadata_page_type = 1;
+constexpr metadata_page_info_t enclave_metadata_page_type = 2;
 
-// Type for metadata pages that hold a thread_info_t for an enclave.
-constexpr metadata_page_info_t thread_info_metadata_page_type = 2;
-
-// Bit that distinguishes between the first page in a structure and other
-// pages.
-constexpr metadata_page_info_t metadata_page_start_mask = 4;
+// Type for metadata pages that hold a thread_metadata_t for an enclave.
+constexpr metadata_page_info_t thread_metadata_page_type = 3;
 
 // Total number of metadata pages in a DRAM region dedicated to metadata.
 extern size_t g_metadata_region_pages;

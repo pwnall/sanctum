@@ -42,7 +42,7 @@ inline size_t dram_region_for(uintptr_t address) {
 //
 // Region index 0 will be returned for pointers outside DRAM.
 inline size_t clamped_dram_region_for(uintptr_t address) {
-  size_t region = dram_region_for(address);
+  const size_t region = dram_region_for(address);
   return (region < g_dram_region_count) ? region : 0;
 }
 
@@ -114,18 +114,18 @@ inline bool is_dram_address(uintptr_t address) {
 
 // Reads the owner from a DRAM region.
 inline enclave_id_t read_dram_region_owner(size_t dram_region) {
-  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
+  const phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
   return region->*(&dram_region_info_t::owner);
 }
 
 // Wipes the data in a DRAM region.
 inline void bzero_dram_region(size_t dram_region) {
   // The address diff between two stripes belonging to the same DRAM region.
-  uintptr_t stripe_step = g_dram_region_count << g_dram_region_shift;
+  const uintptr_t stripe_step = g_dram_region_count << g_dram_region_shift;
 
-  uintptr_t region_start = dram_region << g_dram_region_shift;
+  const uintptr_t region_start = dram_region << g_dram_region_shift;
   for (uintptr_t stripe = 0; stripe < g_dram_size; stripe += stripe_step) {
-    uintptr_t stripe_start = stripe | region_start;
+    const uintptr_t stripe_start = stripe | region_start;
     bzero(phys_ptr<size_t>{stripe_start}, g_dram_stripe_size);
   }
 }
@@ -140,8 +140,8 @@ inline void dram_region_tlb_flush() {
   //       flushed; the moment the counter is incremented, some DRAM region may
   //       be freed and reallocated; this sequence is
 
-  phys_ptr<core_info_t> core_info{&g_core[current_core()]};
-  size_t block_clock = atomic_load(
+  const phys_ptr<core_info_t> core_info{&g_core[current_core()]};
+  const size_t block_clock = atomic_load(
       &(g_dram_regions->*(&dram_regions_info_t::block_clock)));
   atomic_store(&(core_info->*(&core_info_t::flushed_at)), block_clock);
 }

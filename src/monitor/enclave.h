@@ -10,6 +10,7 @@
 namespace sanctum {
 namespace internal {
 
+using sanctum::api::enclave_id_t;
 using sanctum::api::enclave::thread_info_t;
 using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
@@ -20,10 +21,12 @@ using sanctum::bare::uintptr_t;
 using sanctum::crypto::hash_block_size;
 using sanctum::crypto::hash_state_t;
 
-// Extended version of thread_public_info_t.
-struct thread_info_t {
-  // The public thread_public_info_t must be at the beginning of the structure.
-  thread_public_info_t public_info;
+// The per-thread information stored in metadata regions.
+struct thread_metadata_t {
+  // We store the information used to create the thread as-is for simplicity.
+  // thread_metadata_t is a monitor implementation detail, so its layout can
+  // change later, if that makes sense.
+  thread_info_t thread_info;
 
   register_state_t exit_state;  // enter_enclave caller state
   register_state_t aex_state;   // enclave state saved on AEX

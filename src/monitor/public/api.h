@@ -234,8 +234,12 @@ api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner);
 // Frees a DRAM region that was previously locked.
 api_result_t free_dram_region(size_t dram_region);
 
-// Performs the TLB flush needed to free a locked region.
-api_result_t dram_region_flush();
+// Performs the TLB flushes needed to free a locked region.
+//
+// System software must invoke this call instead of flushing the TLB directly,
+// as the monitor's state must be updated to reflect the fact that a TLB flush
+// has occurred.
+api_result_t flush_cached_dram_regions();
 
 // Reserves a free DRAM region to hold enclave metadata.
 //
@@ -282,8 +286,8 @@ size_t enclave_metadata_pages(size_t mailbox_count);
 // mailbox IDs for this enclave will range from 0 to mailbox_count - 1.
 //
 // `debug` is set for debug enclaves. A security monitor that supports
-// enclave debugging will allow debug reads and writes in debug enclaves, to
-// facilitate testing and debugging.
+// enclave debugging implements copy_debug_enclave_page, which can only be used
+// on debug enclaves.
 //
 // All arguments become a part of the enclave's measurement.
 api_result_t create_enclave(enclave_id_t enclave_id, uintptr_t ev_base,
