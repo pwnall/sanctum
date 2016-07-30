@@ -81,9 +81,9 @@ extern size_t g_dma_range_start;
 extern size_t g_dma_range_end;
 
 // The special enclave ID values below are used to make it possible to infer a
-// DRAM region's state by doing an atomic read over its owner field. The values
-// will not be validated by is_valid_enclave_id() because it will extract DRAM
-// region 0 from the ID, and the owner of DRAM region 0 is always 0 (the OS).
+// DRAM region's state by reading its owner field. The values will not be
+// validated by is_valid_enclave_id() because it will extract DRAM region 0 from
+// the ID, and the owner of DRAM region 0 is always 0 (the OS).
 
 // The enclave ID used as the owner of a blocked DRAM region.
 constexpr enclave_id_t blocked_enclave_id = 1;

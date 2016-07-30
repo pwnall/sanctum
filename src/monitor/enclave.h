@@ -23,7 +23,7 @@ using sanctum::crypto::hash_state_t;
 // Extended version of thred_info_t.
 struct thread_private_info_t {
   // The public thread_info_t must be at the beginning of the structure.
-  thread_info_t ti;
+  thread_info_t thread_info;
 
   register_state_t exit_state;  // enter_enclave caller state
   register_state_t aex_state;   // enclave state saved on AEX

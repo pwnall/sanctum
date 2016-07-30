@@ -203,7 +203,7 @@ api_result_t enter_enclave(enclave_id_t enclave_id,
   core->*(&core_info_t::thread_id) = thread_id;
   core->*(&core_info_t::thread) = private_thread;
   phys_ptr<thread_info_t> thread{
-      &(private_thread->*(&thread_private_info_t::ti))};
+      &(private_thread->*(&thread_private_info_t::thread_info))};
   set_ev_base(enclave_info->*(&enclave_info_t::ev_base));
   set_ev_mask(enclave_info->*(&enclave_info_t::ev_mask));
   set_epar_base(uintptr_t(enclave_info));

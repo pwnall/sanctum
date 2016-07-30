@@ -7,6 +7,11 @@ RISC V processor.
 
 ## Building the Code
 
+### Prerequisites
+
+Sanctum requires [git](https://git-scm.com/) and a C++ toolchain that can build
+[CMake](https://cmake.org/) and [LLVM](http://llvm.org/).
+
 ### One-Time Setup
 
 ```bash

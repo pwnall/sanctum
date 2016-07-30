@@ -127,7 +127,7 @@ api_result_t block_dram_region(size_t dram_region) {
   region->*(&dram_region_info_t::owner) = blocked_enclave_id;
   size_t block_clock = atomic_fetch_add(
       &(g_dram_regions->*(&dram_regions_info_t::block_clock)),
-      static_cast<enclave_id_t>(1)) + 1;
+      static_cast<size_t>(1));
   region->*(&dram_region_info_t::blocked_at) = block_clock;
   // TODO: panic if block_clock is max_size_t
 
