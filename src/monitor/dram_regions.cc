@@ -54,12 +54,14 @@ phys_ptr<dram_region_info_t> g_dram_region{0};
 phys_ptr<dram_regions_info_t> g_dram_regions{0};
 
 size_t g_dram_size;
-size_t g_dram_region_count;
-size_t g_dram_region_mask;
 size_t g_dram_region_shift;
-size_t g_dram_region_bitmap_words;
-size_t g_dram_stripe_count;
+size_t g_dram_stripe_shift;
+size_t g_dram_stripe_page_mask;
+size_t g_dram_region_mask;
+size_t g_dram_stripe_mask;
+size_t g_dram_region_count;
 size_t g_dram_stripe_size;
+size_t g_dram_region_bitmap_words;
 size_t g_dma_range_start;
 size_t g_dma_range_end;
 

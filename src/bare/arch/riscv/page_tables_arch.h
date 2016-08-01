@@ -6,15 +6,17 @@
 namespace sanctum {
 namespace bare {
 
-// TODO: set the correct constants here
 constexpr size_t page_shift() {
-  return 13;
+  return 12;
 }
+
+// NOTE: The constants below reflect RV39.
+
 constexpr size_t page_table_levels() {
   return 3;
 }
 constexpr inline size_t page_table_shift(size_t level) {
-  return 10;
+  return 9;
 }
 constexpr inline size_t page_table_entry_shift(size_t level) {
   return 3;  // 8 bytes per page table entry

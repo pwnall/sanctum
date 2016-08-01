@@ -10,7 +10,7 @@ namespace bare {
 static_assert(sizeof(uintptr_t) >= 8, "Sanctum tests require 64-bit pointers");
 
 constexpr size_t page_shift() {
-  return 13;  // Same as 64-bit RISC V
+  return 12;  // Same as 64-bit RISC V
 }
 constexpr size_t page_table_levels() {
   return 3;  // Same as 64-bit RISC V
@@ -21,9 +21,9 @@ constexpr inline size_t page_table_shift(size_t level) {
   // NOTE: we intentionally diverge from RISC V here, because we need the
   //       quirkiest page table setup possible to test the page walking code
 
-  // Three levels: L1 has 2048 entries/table, L2 has 1024 entries/table, L3 has
-  //               4096 entries/table
-  return (level == 0) ? 11 : ((level == 1) ? 10 : 12);
+  // Three levels: L1 has 512 entries/table, L2 has 1024 entries/table, L3 has
+  //               512 entries/table
+  return (level == 0) ? 9 : ((level == 1) ? 10 : 11);
 }
 constexpr inline size_t page_table_entry_shift(size_t level) {
   // NOTE: we can't assert(level < page_table_levels()) because constexpr
@@ -31,8 +31,8 @@ constexpr inline size_t page_table_entry_shift(size_t level) {
   // NOTE: we intentionally diverge from RISC V here, because we need the
   //       quirkiest page table setup possible to test the page walking code
 
-  // L1 has 16-byte entries (4 pages/table), L2 has
-  return (level == 0) ? 4 : ((level == 1) ? 3 : 5);
+  // L1 has 8-byte entries, L2 and L3 have 16-byte entries.
+  return (level == 0) ? 3 : 4;
 }
 
 inline bool is_valid_page_table_entry(uintptr_t entry_addr, size_t level) {

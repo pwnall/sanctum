@@ -5,6 +5,27 @@
 #include "bare/phys_atomics.h"
 #include "public/api.h"
 
+// The computer's DRAM is split up into regions that map to different LLC sets.
+//
+// In order words, if two memory locations belong to different DRAM regions,
+// they can never map to the same LLC line.
+//
+// Stripes are continuous ranges of DRAM. A region is made up of multiple
+// stripes. If the cache address shift is optimal, each DRAM region is
+// contiguous and has exactly one stripe. Otherwise, the stripes alternate in
+// DRAM as follows.
+//
+// R1S1 R2S1 ... RmS1 R1S2 R2S2 ... RmS2 ... R1Sn R2Sn ... RmSn
+//
+// After accounting for the above, a DRAM address can be broken down into the
+// following components.
+//
+// | unused |         bits used to address installed DRAM memory            |
+// |  zero  | stripe index | region index | stripe page index | page offset |
+//
+// With an optimal cache address shift, the stripe index field has zero bits,
+// because the region index is at the top of the DRAM address bits.
+
 namespace sanctum {
 namespace internal {
 
@@ -44,24 +65,35 @@ extern phys_ptr<dram_regions_info_t> g_dram_regions;
 
 // Amount of DRAM installed on the system.
 extern size_t g_dram_size;
-// The bits in a physical address used to indicate the DRAM region.
+
+// NOTE: There is no g_dram_stripe_page_shift -- that is simply page_shift().
+
+// The position of the least significant 1 bit in the DRAM region mask.
+extern size_t g_dram_region_shift;
+// The position of the least significant 1 bit in the DRAM stripe mask.
+extern size_t g_dram_stripe_shift;
+
+// The bits in a physical address that indicate the DRAM region stripe page.
+//
+// Without any cache address shifting, the mask will be zero, because each DRAM
+// stripe will be exactly one page long.
+extern size_t g_dram_stripe_page_mask;
+// The bits in a physical address that indicate the DRAM region.
 //
 // DRAM regions may not be contiguous in DRAM.
 extern size_t g_dram_region_mask;
-// The position of the least significant 1 bit in the DRAM region mask.
-extern size_t g_dram_region_shift;
+// The bits in a physical address that indicate the DRAM region stripe.
+//
+// If the cache address shift is optimal, the mask will be zero, because each
+// DRAM region will have exactly one stripe.
+extern size_t g_dram_stripe_mask;
+
 // The number of DRAM regions indexed by the mask.
 //
 // This is always 1 + (g_dram_region_mask >> g_dram_region_shift).
 extern size_t g_dram_region_count;
+
 // The size of a DRAM stripe.
-//
-// Stripes are continuous ranges of DRAM. A region is made up of multiple
-// stripes. If the cache address shift is optimal, each DRAM region is
-// contiguous and has exactly one stripe. Otherwise, the stripes alternate in
-// DRAM as follows.
-//
-// R1S1 R2S1 ... RmS1 R1S2 R2S2 ... RmS2 ... R1Sn R2Sn ... RmSn
 //
 // The stripe size is always (1 << g_dram_region_shift).
 extern size_t g_dram_stripe_size;

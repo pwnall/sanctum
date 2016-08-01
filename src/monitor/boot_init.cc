@@ -65,7 +65,7 @@ void boot_init_dram_regions() {
 
   size_t line_size = read_cache_line_size(llc);
   size_t line_bits = address_bits_for(line_size);
-  if (line_bits != (1 << line_size))
+  if (line_size != (1 << line_bits))
     boot_panic();  // Sanctum assumes power-of-two cache line sizes.
 
   size_t set_count = read_cache_set_count(llc);
@@ -77,16 +77,15 @@ void boot_init_dram_regions() {
   if (cache_bits <= page_shift())
     boot_panic();  // Address translation doesn't touch any cache indexing bit.
   size_t region_bits = cache_bits - page_shift();
-  g_dram_region_count = 1 << region_bits;
 
-  size_t index_shift = dram_address_bits - cache_bits;
+  size_t stripe_page_bits = dram_address_bits - cache_bits;
   size_t max_shift = read_max_cache_index_shift();
-  if (index_shift > max_shift) {
+  if (stripe_page_bits > max_shift) {
     // DRAM regions will not be continuous.
-    index_shift = max_shift;
+    stripe_page_bits = max_shift;
   }
   size_t min_shift = read_min_cache_index_shift();
-  if (index_shift < min_shift) {
+  if (stripe_page_bits < min_shift) {
     // DRAM can't use the entire cache and some regions are invalid.
     //
     // It's not worth dealing with this case, not taking advantage of the
@@ -95,11 +94,18 @@ void boot_init_dram_regions() {
   }
 
   // TODO: figure out if this requires coordination between cores.
-  set_cache_index_shift(index_shift);
+  set_cache_index_shift(stripe_page_bits);
 
-  g_dram_region_shift = page_shift() + index_shift;
+  g_dram_region_shift = page_shift() + stripe_page_bits;
+  g_dram_stripe_shift = g_dram_region_shift + region_bits;
+
   g_dram_stripe_size = 1 << g_dram_region_shift;
+  g_dram_region_count = 1 << region_bits;
+
+  g_dram_stripe_page_mask = ((1 << stripe_page_bits) - 1) << page_shift();
   g_dram_region_mask = (g_dram_region_count - 1) << g_dram_region_shift;
+  g_dram_stripe_mask =
+      (g_dram_size - 1) >> g_dram_stripe_shift << g_dram_stripe_shift;
 
   // NOTE: relying on the compiler to optimize division to bitwise shift
   g_dram_region_bitmap_words =
@@ -134,10 +140,12 @@ void boot_init_dynamic_arrays() {
 }
 
 void boot_init_metadata() {
-  g_metadata_region_pages = g_dram_stripe_size >> page_shift();
+  g_metadata_region_pages = g_dram_size >>
+      (g_dram_stripe_shift - g_dram_region_shift + page_shift());
 
   // NOTE: relying on the compiler to optimize multiplication to bitwise shift
-  size_t metadata_map_size = g_dram_stripe_size * sizeof(metadata_page_info_t);
+  size_t metadata_map_size =
+      g_metadata_region_pages * sizeof(metadata_page_info_t);
   g_metadata_region_start = pages_needed_for(metadata_map_size);
 }
 

@@ -46,12 +46,29 @@ inline size_t clamped_dram_region_for(uintptr_t address) {
   return (region < g_dram_region_count) ? region : 0;
 }
 
-// Computes an address' page index inside a DRAM region.
+// Computes the DRAM region stripe index for a pointer.
 //
-// This only computes page numbers correctly if the address belongs to the DRAM
-// region's first stripe.
+// Pointers outside DRAM will yield valid but meaningless stripe indices.
+inline size_t dram_stripe_page_for(uintptr_t address) {
+  return (address & g_dram_stripe_page_mask) >> page_shift();
+}
+
+// Computes the DRAM region stripe page index for a pointer.
+//
+// Pointers outside DRAM will yield invalid page indices.
+inline size_t dram_stripe_for(uintptr_t address) {
+  return address >> g_dram_stripe_shift;
+}
+
+// Computes the DRAM region page index for a pointer.
+//
+// The DRAM region page index is unique for a page within a DRAM region,
+// whereas the stripe page index is only unique within a DRAM region stripe.
+//
+// Pointers outside DRAM will yield invalid page indices.
 inline size_t dram_region_page_index(uintptr_t address) {
-  return (address & ~g_dram_region_mask) >> page_shift();
+  return dram_stripe_page_for(address) | (dram_stripe_for(address) <<
+      (g_dram_region_shift - g_dram_stripe_shift));
 }
 
 // Acquires the lock for a DRAM region.

@@ -59,27 +59,31 @@ TEST(BitMaskingTest, IsValidRange) {
 TEST(BitMaskingTest, IsPageAligned) {
   ASSERT_EQ(true, is_page_aligned(0));
   ASSERT_EQ(false, is_page_aligned(1));
+  ASSERT_EQ(true, is_page_aligned(0x1000));
+  ASSERT_EQ(false, is_page_aligned(0x1001));
   ASSERT_EQ(true, is_page_aligned(0x2000));
   ASSERT_EQ(false, is_page_aligned(0x2001));
   ASSERT_EQ(true, is_page_aligned(0x4000));
-  ASSERT_EQ(false, is_page_aligned(0x4001));
-  ASSERT_EQ(true, is_page_aligned(0x6000));
-  ASSERT_EQ(false, is_page_aligned(0x7000));
+  ASSERT_EQ(false, is_page_aligned(0x4800));
 }
 
 TEST(BitMaskingTest, PagesNeededFor) {
   ASSERT_EQ(0, pages_needed_for(0));
   ASSERT_EQ(1, pages_needed_for(1));
-  ASSERT_EQ(1, pages_needed_for(0x1800));
-  ASSERT_EQ(1, pages_needed_for(0x1FFF));
-  ASSERT_EQ(1, pages_needed_for(0x2000));
-  ASSERT_EQ(2, pages_needed_for(0x2001));
-  ASSERT_EQ(2, pages_needed_for(0x3FFF));
-  ASSERT_EQ(2, pages_needed_for(0x4000));
-  ASSERT_EQ(3, pages_needed_for(0x4001));
-  ASSERT_EQ(8, pages_needed_for(65535));
-  ASSERT_EQ(8, pages_needed_for(65536));
-  ASSERT_EQ(9, pages_needed_for(65537));
+  ASSERT_EQ(1, pages_needed_for(0x800));
+  ASSERT_EQ(1, pages_needed_for(0xFFF));
+  ASSERT_EQ(1, pages_needed_for(0x1000));
+  ASSERT_EQ(2, pages_needed_for(0x1001));
+  ASSERT_EQ(2, pages_needed_for(0x1800));
+  ASSERT_EQ(2, pages_needed_for(0x1FFF));
+  ASSERT_EQ(2, pages_needed_for(0x2000));
+  ASSERT_EQ(3, pages_needed_for(0x2001));
+  ASSERT_EQ(4, pages_needed_for(0x3FFF));
+  ASSERT_EQ(4, pages_needed_for(0x4000));
+  ASSERT_EQ(5, pages_needed_for(0x4001));
+  ASSERT_EQ(16, pages_needed_for(65535));
+  ASSERT_EQ(16, pages_needed_for(65536));
+  ASSERT_EQ(17, pages_needed_for(65537));
 }
 
 TEST(BitMaskingTest, AddressBitsFor) {
@@ -245,4 +249,3 @@ TEST(BitMaskingTest, ReadSetBitmapBit) {
   *ptr2 = 0;
   *(ptr2 - 1) = 0;
 }
-
