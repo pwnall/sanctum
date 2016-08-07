@@ -132,12 +132,16 @@ inline bool is_valid_enclave_id(enclave_id_t enclave_id) {
 }
 
 // Reads the owner from a DRAM region.
+//
+// Invalid DRAM region indices will cause memory reads outside the DRAM space.
 inline enclave_id_t read_dram_region_owner(size_t dram_region) {
   const phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
   return region->*(&dram_region_info_t::owner);
 }
 
 // Wipes the data in a DRAM region.
+//
+// Invalid DRAM region indices will cause memory trashing.
 inline void bzero_dram_region(size_t dram_region) {
   // The address diff between two stripes belonging to the same DRAM region.
   const uintptr_t stripe_step = g_dram_region_count << g_dram_region_shift;

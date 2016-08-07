@@ -4,16 +4,32 @@
 
 #include "gtest/gtest.h"
 
+using sanctum::bare::atomic_load;
+using sanctum::bare::atomic_store;
+using sanctum::bare::phys_ptr;
 using sanctum::internal::boot_init_dram_regions;
+using sanctum::internal::boot_init_metadata;
+using sanctum::internal::boot_init_dynamic_arrays;
+using sanctum::internal::bzero_dram_region;
 using sanctum::internal::clamped_dram_region_for;
+using sanctum::internal::clear_dram_region_lock;
+using sanctum::internal::core_info_t;
 using sanctum::internal::dram_region_for;
+using sanctum::internal::dram_region_info_t;
+using sanctum::internal::dram_regions_info_t;
 using sanctum::internal::dram_region_page_for;
 using sanctum::internal::dram_region_start;
+using sanctum::internal::dram_region_tlb_flush;
 using sanctum::internal::dram_stripe_for;
 using sanctum::internal::dram_stripe_page_for;
+using sanctum::internal::g_core;
+using sanctum::internal::g_dram_region;
+using sanctum::internal::g_dram_regions;
 using sanctum::internal::is_dram_address;
 using sanctum::internal::is_dynamic_dram_region;
 using sanctum::internal::is_valid_dram_region;
+using sanctum::internal::read_dram_region_owner;
+using sanctum::internal::test_and_set_dram_region_lock;
 
 namespace {
 
@@ -36,6 +52,8 @@ void set_up_paper_memory_model() {
 
   sanctum::testing::min_cache_index_shift = 0;
   sanctum::testing::max_cache_index_shift = 16;
+
+  sanctum::testing::set_core_count(4);
 }
 
 }
@@ -45,6 +63,8 @@ class DramRegionInlTest : public ::testing::Test {
   virtual void SetUp() {
     set_up_paper_memory_model();
     boot_init_dram_regions();
+    boot_init_metadata();
+    boot_init_dynamic_arrays();
   }
 };
 
@@ -192,5 +212,78 @@ TEST_F(DramRegionInlTest, DramRegionPageFor) {
   EXPECT_EQ(dram_region_page_for(0x3ffff), 7);
 }
 
+TEST_F(DramRegionInlTest, DramRegionLocks) {
+  clear_dram_region_lock(5);
+  test_and_set_dram_region_lock(5);
+  ASSERT_EQ(atomic_flag_test_and_set(
+    &((g_dram_region + 5)->*(&dram_region_info_t::lock))), 1);
+  clear_dram_region_lock(5);
+  ASSERT_EQ(atomic_flag_test_and_set(
+    &((g_dram_region + 5)->*(&dram_region_info_t::lock))), 0);
+  clear_dram_region_lock(5);
+
+  clear_dram_region_lock(0);
+  clear_dram_region_lock(1);
+  clear_dram_region_lock(2);
+  ASSERT_EQ(test_and_set_dram_region_lock(0), 0);
+  ASSERT_EQ(test_and_set_dram_region_lock(0), 1);
+  ASSERT_EQ(test_and_set_dram_region_lock(1), 0);
+  ASSERT_EQ(test_and_set_dram_region_lock(1), 1);
+  ASSERT_EQ(test_and_set_dram_region_lock(2), 0);
+  ASSERT_EQ(test_and_set_dram_region_lock(2), 1);
+  clear_dram_region_lock(1);
+  ASSERT_EQ(test_and_set_dram_region_lock(0), 1);
+  ASSERT_EQ(test_and_set_dram_region_lock(1), 0);
+  ASSERT_EQ(test_and_set_dram_region_lock(2), 1);
+}
+
+TEST_F(DramRegionInlTest, ReadDramRegionOwner) {
+  (g_dram_region + 0)->*(&dram_region_info_t::owner) = 0x42424242;
+  (g_dram_region + 1)->*(&dram_region_info_t::owner) = 0xabababab;
+  (g_dram_region + 2)->*(&dram_region_info_t::owner) = 0x98765432;
+  (g_dram_region + 5)->*(&dram_region_info_t::owner) = 0x12345678;
+  (g_dram_region + 7)->*(&dram_region_info_t::owner) = 0xfccffccf;
+  ASSERT_EQ(read_dram_region_owner(0), 0x42424242);
+  ASSERT_EQ(read_dram_region_owner(1), 0xabababab);
+  ASSERT_EQ(read_dram_region_owner(2), 0x98765432);
+  ASSERT_EQ(read_dram_region_owner(5), 0x12345678);
+  ASSERT_EQ(read_dram_region_owner(7), 0xfccffccf);
+}
+
+TEST_F(DramRegionInlTest, BzeroDramRegion) {
+  for (size_t i = 0; i < 256 * 1024; i += sizeof(uintptr_t))
+    *(phys_ptr<uintptr_t>{i}) = ~0;
+  bzero_dram_region(1);
+
+  for (size_t i = 0; i < 32 * 1024; i += sizeof(uintptr_t))
+    ASSERT_EQ(*(phys_ptr<uintptr_t>{i}), ~0);
+  for (size_t i = 32 * 1024; i < 64 * 1024; i += sizeof(uintptr_t))
+    ASSERT_EQ(*(phys_ptr<uintptr_t>{i}), 0);
+  for (size_t i = 64 * 1024; i < 256 * 1024; i += sizeof(uintptr_t))
+    ASSERT_EQ(*(phys_ptr<uintptr_t>{i}), ~0);
+}
+
+TEST_F(DramRegionInlTest, DramRegionTlbFlush) {
+  sanctum::testing::core_tlb_flush_count[0] = 16;
+  sanctum::testing::core_tlb_flush_count[1] = 32;
+  sanctum::testing::core_tlb_flush_count[2] = 64;
+  sanctum::testing::core_tlb_flush_count[3] = 128;
+  sanctum::testing::set_current_core(2);
+  atomic_store(&(g_dram_regions->*(&dram_regions_info_t::block_clock)),
+               static_cast<size_t>(0x12345678));
+  atomic_store(&((g_core + 2)->*(&core_info_t::flushed_at)),
+               static_cast<size_t>(0));
+
+  dram_region_tlb_flush();
+
+  ASSERT_EQ(sanctum::testing::core_tlb_flush_count[0], 16);
+  ASSERT_EQ(sanctum::testing::core_tlb_flush_count[1], 32);
+  ASSERT_EQ(sanctum::testing::core_tlb_flush_count[2], 65);
+  ASSERT_EQ(sanctum::testing::core_tlb_flush_count[3], 128);
+  ASSERT_EQ(atomic_load(&((g_core + 2)->*(&core_info_t::flushed_at))),
+            static_cast<size_t>(0x12345678));
+}
+
 // TODO: test dram_stripe_for in multi-stripe memory setting
 // TODO: test dram_region_page_for in multi-stripe memory setting
+// TODO: test bzero_dram_region in multi-stripe memory setting
