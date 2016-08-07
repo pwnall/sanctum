@@ -24,6 +24,28 @@ using sanctum::bare::set_bitmap_bit;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 
+// Verifies that a physical address belongs in DRAM.
+//
+// Physical addresses can also point to space belonging to memory-mapped
+// devices, or to invalid physical addresses.
+inline bool is_dram_address(uintptr_t address) {
+  return address < g_dram_size;
+}
+
+// True for valid DRAM region indices.
+//
+// This can be called without holding locks, as it relies on constant state.
+inline bool is_valid_dram_region(size_t dram_region) {
+  return dram_region < g_dram_region_count;
+}
+// True for DRAM regions that can be freed and re-assigned.
+//
+// The first DRAM region contains monitor code, so it can only be assigned to
+// the OS.
+inline bool is_dynamic_dram_region(size_t dram_region) {
+  return dram_region != 0 && is_valid_dram_region(dram_region);
+}
+
 // Computes the physical start address of a DRAM region.
 //
 // Invalid DRAM region indices will yield invalid pointers.
@@ -33,7 +55,7 @@ inline uintptr_t dram_region_start(size_t dram_region) {
 
 // Computes the DRAM region index for a pointer.
 //
-// Pointers outside DRAM will yield invalid region indices.
+// Pointers outside DRAM will yield valid but meaningless region indices.
 inline size_t dram_region_for(uintptr_t address) {
   return (address & g_dram_region_mask) >> g_dram_region_shift;
 }
@@ -42,18 +64,17 @@ inline size_t dram_region_for(uintptr_t address) {
 //
 // Region index 0 will be returned for pointers outside DRAM.
 inline size_t clamped_dram_region_for(uintptr_t address) {
-  const size_t region = dram_region_for(address);
-  return (region < g_dram_region_count) ? region : 0;
+  return is_dram_address(address) ? dram_region_for(address) : 0;
 }
 
-// Computes the DRAM region stripe index for a pointer.
+// Computes the DRAM region stripe page index for a pointer.
 //
 // Pointers outside DRAM will yield valid but meaningless stripe indices.
 inline size_t dram_stripe_page_for(uintptr_t address) {
   return (address & g_dram_stripe_page_mask) >> page_shift();
 }
 
-// Computes the DRAM region stripe page index for a pointer.
+// Computes the DRAM region stripe index for a pointer.
 //
 // Pointers outside DRAM will yield invalid page indices.
 inline size_t dram_stripe_for(uintptr_t address) {
@@ -66,7 +87,7 @@ inline size_t dram_stripe_for(uintptr_t address) {
 // whereas the stripe page index is only unique within a DRAM region stripe.
 //
 // Pointers outside DRAM will yield invalid page indices.
-inline size_t dram_region_page_index(uintptr_t address) {
+inline size_t dram_region_page_for(uintptr_t address) {
   return dram_stripe_page_for(address) | (dram_stripe_for(address) <<
       (g_dram_region_shift - g_dram_stripe_shift));
 }
@@ -90,20 +111,6 @@ inline void clear_dram_region_lock(size_t dram_region) {
   atomic_flag_clear(&(region->*(&dram_region_info_t::lock)));
 }
 
-// True for valid DRAM region indices.
-//
-// This can be called without holding locks, as it relies on constant state.
-inline bool is_valid_dram_region(size_t dram_region) {
-  return dram_region < g_dram_region_count;
-}
-// True for DRAM regions that can be freed and re-assigned.
-//
-// The first DRAM region contains monitor code, so it can only be assigned to
-// the OS.
-inline bool is_dynamic_dram_region(size_t dram_region) {
-  return dram_region != 0 && is_valid_dram_region(dram_region);
-}
-
 // Verifies the validity of an enclave ID. 0 is considered a valid ID.
 //
 // This should be called while holding the DRAM region lock for the region
@@ -119,14 +126,6 @@ inline bool is_valid_enclave_id(enclave_id_t enclave_id) {
   // NOTE: the first DRAM region always belongs to the OS, so this returns true
   //       when enclave_id is 0 / null_enclave_id (indicating OS ownership)
   return region->*(&dram_region_info_t::owner) == enclave_id;
-}
-
-// Verifies that a physical address belongs in DRAM.
-//
-// Physical addresses can also point to space belonging to memory-mapped
-// devices, or to invalid physical addresses.
-inline bool is_dram_address(uintptr_t address) {
-  return address < g_dram_size;
 }
 
 // Reads the owner from a DRAM region.

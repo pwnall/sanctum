@@ -18,7 +18,7 @@ using sanctum::bare::pages_needed_for;
 inline phys_ptr<metadata_page_info_t> metadata_page_info_for(
     uintptr_t phys_addr) {
   return phys_ptr<metadata_page_info_t>{dram_region_start(phys_addr)} +
-      dram_region_page_index(phys_addr);
+      dram_region_page_for(phys_addr);
 }
 
 // Computes the physical address of an enclave's DRAM region bitmap.

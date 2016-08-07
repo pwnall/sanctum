@@ -46,7 +46,7 @@ void boot_panic() {
 }
 
 void boot_init_monitor_top() {
-  // TODO: implement this
+  // TODO: implement this by reading some linker symbol
   g_monitor_top = 0;
 }
 
@@ -165,7 +165,7 @@ void boot_init_protection() {
   if (g_monitor_top > g_dram_stripe_size)
     boot_panic();  // Sanctum assumes that the monitor fits into a DRAM stripe.
 
-  // NOTE: we're allowing DMA transfers for 1 byte at the
+  // NOTE: we're allowing DMA transfers for 1 byte at the top of the monitor.
   g_dma_range_start = g_monitor_top;
   g_dma_range_end = g_dma_range_start + 1;
   set_dmar_base(g_dma_range_start);
