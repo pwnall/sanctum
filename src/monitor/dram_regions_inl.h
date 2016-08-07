@@ -106,6 +106,9 @@ inline bool test_and_set_dram_region_lock(size_t dram_region) {
 // Releases the lock for a DRAM region.
 //
 // Invalid DRAM region indices will cause memory thrashing.
+//
+// Clear a lock that was not explicitly acquired is a security vulnerability,
+// because another piece of code might have acquired the lock.
 inline void clear_dram_region_lock(size_t dram_region) {
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
   atomic_flag_clear(&(region->*(&dram_region_info_t::lock)));

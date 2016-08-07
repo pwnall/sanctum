@@ -24,8 +24,6 @@ uintptr_t core_par_base[max_cores];
 uintptr_t core_epar_base[max_cores];
 uintptr_t core_par_mask[max_cores];
 uintptr_t core_epar_mask[max_cores];
-uintptr_t core_par_emask[max_cores];
-uintptr_t core_epar_emask[max_cores];
 size_t core_drb_map[max_cores][max_dram_region_bitmap_words];
 size_t core_edrb_map[max_cores][max_dram_region_bitmap_words];
 
@@ -54,5 +52,3 @@ void snapshot_dram_region_bitmap(uintptr_t* bitmap_register,
 
 };  // namespace sanctum::testing
 };  // namespace sanctum
-
-

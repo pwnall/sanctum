@@ -20,7 +20,6 @@ extern size_t cache_line_size[], cache_set_count[];
 namespace sanctum {
 namespace bare {
 
-
 inline void set_dmar_base(uintptr_t value) {
   testing::dmar_base = value;
 }

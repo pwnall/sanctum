@@ -26,7 +26,9 @@ void signal_handler(int sig) {
 int main(int argc, char** argv) {
   signal(SIGSEGV, signal_handler);
 
-  sanctum::testing::init_phys_buffer(8192);
+  // NOTE: The toy computer example in the Sanctum paper uses 256KB of RAM, and
+  //       most monitor tests are based on that example.
+  sanctum::testing::init_phys_buffer(256 * 1024);
 
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

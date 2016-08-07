@@ -66,16 +66,6 @@ void set_epar_mask(uintptr_t value);
 // This can only be issued by the security monitor.
 void set_par_mask(uintptr_t value);
 
-// Sets the EPAREMASK (enclave protected address range entry mask) register.
-//
-// This can only be issued by the security monitor.
-void set_epar_emask(uintptr_t value);
-
-// Sets the PAREMASK (protected address range entry mask) register.
-//
-// This can only be issued by the security monitor.
-void set_par_emask(uintptr_t value);
-
 // Sets the EVBASE (enclave virtual address base register).
 //
 // This can only be issued by the security monitor.

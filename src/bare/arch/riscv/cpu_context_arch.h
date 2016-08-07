@@ -39,12 +39,6 @@ inline void set_epar_mask(uintptr_t value) {
 inline void set_par_mask(uintptr_t value) {
   // TODO: asm intrinsic
 }
-inline void set_epar_emask(uintptr_t value) {
-  // TODO: asm intrinsic
-}
-inline void set_par_emask(uintptr_t value) {
-  // TODO: asm intrinsic
-}
 inline void set_ev_base(uintptr_t value) {
   // TODO: asm intrinsic
 }

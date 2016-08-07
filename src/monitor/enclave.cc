@@ -26,7 +26,6 @@ using sanctum::bare::phys_ptr;
 using sanctum::bare::set_edrb_map;
 using sanctum::bare::set_epar_base;
 using sanctum::bare::set_epar_mask;
-using sanctum::bare::set_epar_emask;
 using sanctum::bare::set_eptbr;
 using sanctum::bare::set_ev_base;
 using sanctum::bare::set_ev_mask;
@@ -188,8 +187,6 @@ api_result_t enter_enclave(enclave_id_t enclave_id,
   set_ev_mask(enclave_info->*(&enclave_info_t::ev_mask));
   set_epar_base(uintptr_t(enclave_info));
   set_epar_mask(enclave_info->*(&enclave_info_t::epar_mask));
-  // TODO: set the permissions mask to allow reads
-  set_epar_emask(0);
   set_edrb_map(uintptr_t(enclave_region_bitmap(enclave_id)));
   set_eptbr(thread->*(&thread_info_t::eptbr));
   */
@@ -422,7 +419,7 @@ api_result_t exit_enclave() {
   //       with a non-zero number.
   set_ev_base(page_size());
   set_ev_mask(0);
-  // NOTE: we don't need to reset eptbr, edrb_map and epar_{base, mask, emask},
+  // NOTE: we don't need to reset eptbr, edrb_map and epar_{base, mask},
   //       because they'll never make it out of the page walker input MUXes.
 
   atomic_fetch_sub(&(enclave_info->*(&enclave_info_t::running_threads)),

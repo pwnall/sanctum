@@ -31,7 +31,6 @@ using sanctum::bare::set_dmar_base;
 using sanctum::bare::set_dmar_mask;
 using sanctum::bare::set_par_base;
 using sanctum::bare::set_par_mask;
-using sanctum::bare::set_par_emask;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 
@@ -112,33 +111,6 @@ void boot_init_dram_regions() {
       (g_dram_region_count + bits_in_size_t - 1) / bits_in_size_t;
 }
 
-void boot_init_dynamic_arrays() {
-  g_core_count = read_core_count();
-  g_core = phys_ptr<core_info_t>{g_monitor_top};
-  g_monitor_top = uintptr_t(g_core + g_core_count);
-
-  g_dram_region = phys_ptr<dram_region_info_t>{g_monitor_top};
-  g_monitor_top = uintptr_t(g_dram_region + g_dram_region_count);
-  for (size_t i = 0; i < g_dram_region_count; ++i) {
-    phys_ptr<dram_region_info_t> region{g_dram_region + i};
-    atomic_flag_clear(&(region->*(&dram_region_info_t::lock)));
-    region->*(&dram_region_info_t::owner) = null_enclave_id;
-    region->*(&dram_region_info_t::previous_owner) = null_enclave_id;
-    region->*(&dram_region_info_t::pinned_pages) = 0;
-    region->*(&dram_region_info_t::blocked_at) = 0;
-  }
-
-  g_dram_regions = phys_ptr<dram_regions_info_t>{g_monitor_top};
-  g_monitor_top = uintptr_t(g_dram_regions + 1);
-  atomic_init(&(g_dram_regions->*(&dram_regions_info_t::block_clock)),
-      static_cast<size_t>(0));
-
-  g_os_region_bitmap = phys_ptr<size_t>{g_monitor_top};
-  g_monitor_top = uintptr_t(g_os_region_bitmap + g_dram_region_bitmap_words);
-  for (size_t i = 0; i < g_dram_region_count; ++i)
-    set_bitmap_bit(g_os_region_bitmap, i, 1);
-}
-
 void boot_init_metadata() {
   g_metadata_region_pages = g_dram_size >>
       (g_dram_stripe_shift - g_dram_region_shift + page_shift());
@@ -149,17 +121,40 @@ void boot_init_metadata() {
   g_metadata_region_start = pages_needed_for(metadata_map_size);
 }
 
+void boot_init_dynamic_arrays() {
+  g_core_count = read_core_count();
+  g_core = phys_ptr<core_info_t>{g_monitor_top};
+  g_monitor_top = static_cast<uintptr_t>(g_core + g_core_count);
+
+  g_dram_region = phys_ptr<dram_region_info_t>{g_monitor_top};
+  g_monitor_top = static_cast<uintptr_t>(g_dram_region + g_dram_region_count);
+  for (size_t i = 0; i < g_dram_region_count; ++i) {
+    phys_ptr<dram_region_info_t> region{g_dram_region + i};
+    atomic_flag_clear(&(region->*(&dram_region_info_t::lock)));
+    region->*(&dram_region_info_t::owner) = null_enclave_id;
+    region->*(&dram_region_info_t::previous_owner) = null_enclave_id;
+    region->*(&dram_region_info_t::pinned_pages) = 0;
+    region->*(&dram_region_info_t::blocked_at) = 0;
+  }
+
+  g_dram_regions = phys_ptr<dram_regions_info_t>{g_monitor_top};
+  g_monitor_top = static_cast<uintptr_t>(g_dram_regions + 1);
+  atomic_init(&(g_dram_regions->*(&dram_regions_info_t::block_clock)),
+      static_cast<size_t>(0));
+
+  g_os_region_bitmap = phys_ptr<size_t>{g_monitor_top};
+  g_monitor_top = static_cast<uintptr_t>(
+      g_os_region_bitmap + g_dram_region_bitmap_words);
+  for (size_t i = 0; i < g_dram_region_count; ++i)
+    set_bitmap_bit(g_os_region_bitmap, i, 1);
+}
+
 void boot_init_protection() {
   // The monitor's code and data will be covered by a range in the address
   // translation, so we must round it up to a power of two.
   g_monitor_top = ceil_power_of_two(g_monitor_top);
   set_par_base(static_cast<uintptr_t>(0));
   set_par_mask(~(static_cast<uintptr_t>(g_monitor_top - 1)));
-  // NOTE: We're disallowing reads into the monitor space because it contains
-  //       the private attestation key. Ideally, we'd like to allow the OS to
-  //       read most of the monitor. However, we only have one protection range
-  //       available.
-  set_par_emask(0);
   set_drb_map(uintptr_t(g_os_region_bitmap));
 
   if (g_monitor_top > g_dram_stripe_size)
