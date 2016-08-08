@@ -178,6 +178,7 @@ TEST(BootInitTest, MetadataShiftOne) {
   ASSERT_EQ(g_metadata_region_pages, 8);
   ASSERT_EQ(g_metadata_region_start, 1);
 }
+
 TEST(BootInitTest, MetadataShiftTwo) {
   set_up_paper_memory_model();
   sanctum::testing::max_cache_index_shift = 2;
@@ -185,6 +186,60 @@ TEST(BootInitTest, MetadataShiftTwo) {
   boot_init_metadata();
 
   ASSERT_EQ(g_metadata_region_pages, 8);
+  ASSERT_EQ(g_metadata_region_start, 1);
+}
+
+TEST(BootInitTest, MetadataNoShiftMediumStripes) {
+  set_up_paper_memory_model();
+  sanctum::testing::dram_size = 1 << 22;
+  sanctum::testing::max_cache_index_shift = 0;
+
+  boot_init_dram_regions();
+  ASSERT_EQ(g_dram_region_count, 8);
+  ASSERT_EQ(g_dram_region_shift, 12);
+  ASSERT_EQ(g_dram_stripe_shift, 15);
+
+  boot_init_metadata();
+  ASSERT_EQ(g_metadata_region_pages, 128);
+  ASSERT_EQ(g_metadata_region_start, 1);
+}
+
+TEST(BootInitTest, MetadataNoShiftLargeStripes) {
+  set_up_paper_memory_model();
+  // NOTE: The DRAM size below is the minimum required to get the metadata
+  //        region size to the point where the metadata map barely fits into
+  //        a DRAM region stripe.
+  sanctum::testing::dram_size = 1 << 24;
+  sanctum::testing::max_cache_index_shift = 0;
+
+  boot_init_dram_regions();
+  ASSERT_EQ(g_dram_region_count, 8);
+  ASSERT_EQ(g_dram_region_shift, 12);
+  ASSERT_EQ(g_dram_stripe_shift, 15);
+
+  boot_init_metadata();
+  // NOTE: The expected page count here should match the expected count in
+  //       the MetadataNoShiftHugeStripes test case.
+  ASSERT_EQ(g_metadata_region_pages, 512);
+  ASSERT_EQ(g_metadata_region_start, 1);
+}
+
+TEST(BootInitTest, MetadataNoShiftHugeStripes) {
+  set_up_paper_memory_model();
+  // NOTE: The DRAM size below should be bigger than the size used by the
+  //       MetadataNoShiftLargeStripe test.
+  sanctum::testing::dram_size = 1 << 28;
+  sanctum::testing::max_cache_index_shift = 0;
+
+  boot_init_dram_regions();
+  ASSERT_EQ(g_dram_region_count, 8);
+  ASSERT_EQ(g_dram_region_shift, 12);
+  ASSERT_EQ(g_dram_stripe_shift, 15);
+
+  boot_init_metadata();
+  // NOTE: The expected page count here should match the expected count in
+  //       the MetadataNoShiftLargeStripes test case.
+  ASSERT_EQ(g_metadata_region_pages, 512);
   ASSERT_EQ(g_metadata_region_start, 1);
 }
 

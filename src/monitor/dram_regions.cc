@@ -37,6 +37,7 @@ using sanctum::internal::g_dram_region_shift;
 using sanctum::internal::g_dram_size;
 using sanctum::internal::g_dram_stripe_size;
 using sanctum::internal::g_os_region_bitmap;
+using sanctum::internal::init_metadata_region;
 using sanctum::internal::is_dram_address;
 using sanctum::internal::is_dynamic_dram_region;
 using sanctum::internal::is_valid_dram_region;
@@ -187,30 +188,40 @@ dram_region_state_t dram_region_state(size_t dram_region) {
   if (!is_valid_dram_region(dram_region))
     return dram_region_invalid;
 
-  // NOTE: we don't need to acquire the DRAM region's lock, because we're using
-  //       an atomic read
+  if (test_and_set_dram_region_lock(dram_region))
+    return dram_region_locked;
+
+  dram_region_state_t state;
   switch (read_dram_region_owner(dram_region)) {
   case null_enclave_id:
-    return dram_region_owned;
+    state = dram_region_owned;
+    break;
   case blocked_enclave_id:
-    return dram_region_blocked;
+    state = dram_region_blocked;
+    break;
   case free_enclave_id:
-    return dram_region_free;
+    state = dram_region_free;
+    break;
   default:
-    return dram_region_owned;
+    state = dram_region_owned;
   }
+
+  clear_dram_region_lock(dram_region);
+  return state;
 }
 
 enclave_id_t dram_region_owner(size_t dram_region) {
   if (!is_valid_dram_region(dram_region))
     return null_enclave_id;
 
-  // NOTE: we don't need to acquire the DRAM region's lock, because we're using
-  //       an atomic read
-  enclave_id_t owner = read_dram_region_owner(dram_region);
-  if (owner == blocked_enclave_id || owner == free_enclave_id)
+  if (test_and_set_dram_region_lock(dram_region))
     return null_enclave_id;
 
+  enclave_id_t owner = read_dram_region_owner(dram_region);
+  if (owner == blocked_enclave_id || owner == free_enclave_id)
+    owner = null_enclave_id;
+
+  clear_dram_region_lock(dram_region);
   return owner;
 }
 
@@ -264,6 +275,23 @@ api_result_t set_dma_range(uintptr_t base, uintptr_t mask) {
   return monitor_ok;
 }
 
+api_result_t create_metadata_region(size_t dram_region) {
+  if (!is_valid_dram_region(dram_region))
+    return monitor_invalid_value;
+  if (test_and_set_dram_region_lock(dram_region))
+    return monitor_concurrent_call;
+
+  if (read_dram_region_owner(dram_region) != free_enclave_id) {
+    clear_dram_region_lock(dram_region);
+    return monitor_invalid_state;
+  }
+
+  init_metadata_region(dram_region);
+
+  clear_dram_region_lock(dram_region);
+  return monitor_ok;
+}
+
 api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
   // NOTE: non-dynamic DRAM regions will never be freed, so we don't need to
   //       explicitly check for them here
@@ -306,6 +334,7 @@ api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner) {
   clear_dram_region_lock(dram_region);
   return result;
 }
+
 api_result_t free_dram_region(size_t dram_region) {
   // NOTE: non-dynamic DRAM regions will never be blocked, so we don't need to
   //       explicitly check for them here

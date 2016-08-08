@@ -107,4 +107,3 @@ TEST(HashTest, PageOfU) {
   EXPECT_EQ(0xfbaa8c16, h[6]);
   EXPECT_EQ(0x84db80c3, h[7]);
 }
-

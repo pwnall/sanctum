@@ -13,7 +13,43 @@ namespace internal {  // sanctum::internal
 
 using sanctum::api::mailbox_id_t;
 using sanctum::api::null_enclave_id;
+using sanctum::bare::is_page_aligned;
 using sanctum::bare::pages_needed_for;
+
+// Initializes a DRAM region to be used as a metadata region.
+//
+// Invalid DRAM region indices will cause memory trashing.
+//
+// The caller should hold the given DRAM region's lock. The DRAM region should
+// be free.
+inline void init_metadata_region(size_t dram_region) {
+  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
+  region->*(&dram_region_info_t::owner) = metadata_enclave_id;
+  region->*(&dram_region_info_t::pinned_pages) = 0;
+
+  phys_ptr<metadata_page_info_t> metadata_map{dram_region_start(dram_region)};
+  bzero(metadata_map, g_metadata_region_start << page_shift());
+}
+
+// Locks the metadata region corresponding to a metadata page address.
+//
+// Returns null if the address is not a valid metadata page address.
+inline phys_ptr<dram_region_info_t>
+    lock_metadata_region_for(uintptr_t phys_addr) {
+  if (!is_page_aligned(phys_addr) || !is_dram_address(phys_addr))
+    return phys_ptr<dram_region_info_t>::null();
+
+  const size_t dram_region = dram_region_for(phys_addr);
+  if (test_and_set_dram_region_lock(dram_region))
+    return phys_ptr<dram_region_info_t>::null();
+
+  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
+  if (region->*(&dram_region_info_t::owner) != metadata_enclave_id) {
+    clear_dram_region_lock(dram_region);
+    return phys_ptr<dram_region_info_t>::null();
+  }
+  return region;
+}
 
 inline phys_ptr<metadata_page_info_t> metadata_page_info_for(
     uintptr_t phys_addr) {
@@ -97,6 +133,23 @@ inline bool read_enclave_region_bitmap_bit(enclave_id_t enclave_id,
     return read_bitmap_bit(g_os_region_bitmap, dram_region);
   else
     return read_bitmap_bit(enclave_region_bitmap(enclave_id), dram_region);
+}
+
+// Verifies the validity of an enclave ID. 0 is considered a valid ID.
+//
+// This should be called while holding the DRAM region lock for the region
+// corresponding to the given ID. This is computed by
+// clamped_dram_region_for(enclave_id).
+//
+// Returns true if the given enclave ID is valid, and false otherwise. 0 is
+// used to indicate OS ownership of DRAM areas, so it is considered a valid ID.
+inline bool is_valid_enclave_id(enclave_id_t enclave_id) {
+  size_t dram_region = clamped_dram_region_for(enclave_id);
+  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
+
+  // NOTE: the first DRAM region always belongs to the OS, so this returns true
+  //       when enclave_id is 0 / null_enclave_id (indicating OS ownership)
+  return region->*(&dram_region_info_t::owner) == enclave_id;
 }
 
 };  // namespace sanctum::internal

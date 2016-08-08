@@ -118,6 +118,17 @@ void boot_init_metadata() {
   // NOTE: relying on the compiler to optimize multiplication to bitwise shift
   size_t metadata_map_size =
       g_metadata_region_pages * sizeof(metadata_page_info_t);
+
+  // This monitor implementation assumes that the metadata map fits into a
+  // single DRAM stripe. In the unlikely instance of huge DRAM regions with
+  // tiny stripes, we give up some of the metadata region capacity in order to
+  // make the invariant hold.
+  if (metadata_map_size > g_dram_stripe_size) {
+    metadata_map_size  = g_dram_stripe_size;
+    // NOTE: relying on the compiler to optimize division to bitwise shift
+    g_metadata_region_pages = metadata_map_size / sizeof(metadata_page_info_t);
+  }
+
   g_metadata_region_start = pages_needed_for(metadata_map_size);
 }
 

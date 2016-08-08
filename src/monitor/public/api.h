@@ -92,14 +92,18 @@ size_t dram_region_mask();
 //
 // Enclaves calling this API are responsible for wiping any confidential
 // information from the relinquished DRAM region.
+//
+// Before issuing this call, the OS is responsible for wiping its own
+// confidential information from the DRAM region.
 api_result_t block_dram_region(size_t dram_region);
 
 namespace enclave {  // sanctum::api::enclave
 
-// Returns 0 if the given DRAM region is owned by the calling enclave.
+// Returns monitor_ok if the given DRAM region is owned by the calling enclave.
 //
 // This is used by enclaves to confirm that they own a DRAM region when the OS
-// tells them that they do.
+// tells them that they do. The enclave should that assume something went wrong
+// if it sees any return value other than monitor_ok.
 api_result_t dram_region_check_ownership(size_t dram_region);
 
 // Allocates a thread info slot.
@@ -202,7 +206,8 @@ typedef enum {
   dram_region_invalid = 0,
   dram_region_free = 1,
   dram_region_blocked = 2,
-  dram_region_owned = 3,
+  dram_region_locked = 3,
+  dram_region_owned = 4,
 } dram_region_state_t;
 
 // Sets the memory range that allows DMA transfers.
@@ -213,12 +218,14 @@ api_result_t set_dma_range(uintptr_t base, uintptr_t mask);
 // Returns the state of the DRAM region with the given index.
 //
 // Returns dram_region_invalid if the given DRAM region index is invalid.
+// Returns dram_region_locked if the given DRAM region is currently locked by
+// another API call.
 dram_region_state_t dram_region_state(size_t dram_region);
 
 // Returns the owner of the DRAM region with the given index.
 //
-// Returns null_enclave_id if the given DRAM region index is invalid, or if the
-// region is not in the owned state.
+// Returns null_enclave_id if the given DRAM region index is invalid, locked by
+// another operation, or if the region is not in the owned state.
 enclave_id_t dram_region_owner(size_t dram_region);
 
 // Assigns a free DRAM region to an enclave or to the OS.
@@ -226,9 +233,6 @@ enclave_id_t dram_region_owner(size_t dram_region);
 // `new_owner` is the enclave ID of the enclave that will own the DRAM region.
 // 0 means that the DRAM region will be assigned to the OS.
 //
-// Before issuing this call, the OS is responsible for wiping confidential
-// information from the DRAM region, if it was previously assigned to the OS.
-// The OS is not responsible for wiping enclave-owned DRAM regions.
 api_result_t assign_dram_region(size_t dram_region, enclave_id_t new_owner);
 
 // Frees a DRAM region that was previously locked.
@@ -242,10 +246,6 @@ api_result_t free_dram_region(size_t dram_region);
 api_result_t flush_cached_dram_regions();
 
 // Reserves a free DRAM region to hold enclave metadata.
-//
-// Before issuing this call, the OS is responsible for wiping confidential
-// information from the DRAM region, if it was previously assigned to the OS.
-// The OS is not responsible for wiping enclave-owned DRAM regions.
 //
 // DRAM regions that hold enclave metadata can be freed directly by calling
 // free_dram_region(). Calling block_dram_region() on them will fail.
@@ -293,15 +293,6 @@ size_t enclave_metadata_pages(size_t mailbox_count);
 api_result_t create_enclave(enclave_id_t enclave_id, uintptr_t ev_base,
     uintptr_t ev_mask, size_t mailbox_count, bool debug);
 
-// Allocates a sequence of metadata pages for a thread_info_t structure.
-//
-// `enclave_id` is the ID of the enclave that will own the thread structure.
-//
-// `thread_id` must be the physical address of a sequence of free pages in a
-// DRAM metadata region. The number of pages required can be obtained by
-// calling
-api_result_t create_thread(enclave_id_t enclave_id, thread_id_t thread_id);
-
 // Allocates a page in the enclave's main DRAM region for page tables.
 //
 // `enclave_id` must be an enclave that has not yet been initialized.
@@ -341,9 +332,9 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
 // `thread_id` must be smaller than the enclave's maximum thread count, and
 // must not be used by another hardware thread.
 //
-// `virtual_addr` must point to thread_public_info_pages() pages of virtual memory
-// that was previously initialized by calling load_enclave_page(). The address
-// must be page-aligned.
+// `virtual_addr` must point to thread_public_info_pages() pages of virtual
+// memory that was previously initialized by calling load_enclave_page(). The
+// address must be page-aligned.
 //
 // The virtual memory buffer pointed by `virtual_addr` must map to a contiguous
 // range of physical memory pages that belong to the same DRAM region,

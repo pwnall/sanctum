@@ -11,16 +11,10 @@ namespace sanctum {
 namespace internal {  // sanctum::internal
 
 using sanctum::api::enclave_id_t;
-using sanctum::api::null_enclave_id;
-using sanctum::api::os::dram_region_state_t;
-using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
 using sanctum::bare::bzero;
-using sanctum::bare::is_valid_range;
 using sanctum::bare::page_shift;
 using sanctum::bare::phys_ptr;
-using sanctum::bare::read_bitmap_bit;
-using sanctum::bare::set_bitmap_bit;
 using sanctum::bare::size_t;
 using sanctum::bare::uintptr_t;
 
@@ -112,23 +106,6 @@ inline bool test_and_set_dram_region_lock(size_t dram_region) {
 inline void clear_dram_region_lock(size_t dram_region) {
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
   atomic_flag_clear(&(region->*(&dram_region_info_t::lock)));
-}
-
-// Verifies the validity of an enclave ID. 0 is considered a valid ID.
-//
-// This should be called while holding the DRAM region lock for the region
-// corresponding to the given ID. This is computed by
-// clamped_dram_region_for(enclave_id).
-//
-// Returns true if the given enclave ID is valid, and false otherwise. 0 is
-// used to indicate OS ownership of DRAM areas, so it is considered a valid ID.
-inline bool is_valid_enclave_id(enclave_id_t enclave_id) {
-  size_t dram_region = clamped_dram_region_for(enclave_id);
-  phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-
-  // NOTE: the first DRAM region always belongs to the OS, so this returns true
-  //       when enclave_id is 0 / null_enclave_id (indicating OS ownership)
-  return region->*(&dram_region_info_t::owner) == enclave_id;
 }
 
 // Reads the owner from a DRAM region.

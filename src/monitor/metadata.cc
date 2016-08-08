@@ -50,25 +50,6 @@ size_t thread_metadata_pages() {
   return sanctum::internal::thread_metadata_pages();
 }
 
-api_result_t create_metadata_region(size_t dram_region) {
-  if (!is_valid_dram_region(dram_region))
-    return monitor_invalid_value;
-  if (test_and_set_dram_region_lock(dram_region))
-    return monitor_concurrent_call;
-
-  if (read_dram_region_owner(dram_region) == free_enclave_id) {
-    phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
-    region->*(&dram_region_info_t::owner) = metadata_enclave_id;
-    region->*(&dram_region_info_t::pinned_pages) = 0;
-  }
-
-  phys_ptr<metadata_page_info_t> metadata_map{dram_region_start(dram_region)};
-  bzero(metadata_map, g_metadata_region_start << page_shift());
-
-  clear_dram_region_lock(dram_region);
-  return monitor_ok;
-}
-
 api_result_t create_thread(enclave_id_t enclave_id, thread_id_t thread_id) {
   return monitor_ok;
 }

@@ -5,9 +5,24 @@
 #include "bare/phys_atomics.h"
 #include "public/api.h"
 
+// Metadata regions are DRAM regions that are dedicated to storing the metadata
+// used by the monitor to manage enclaves. The metadata is not stored inside
+// enclave regions so that the monitor can read or modify the metadata without
+// impacting an enclave's LLC lines.
+//
+// Each metadata region is managed as a collection of pages. The first few
+// pages store an array of metadata_page_info_t elements, and the other pages
+// are usable for metadata storage. Each metadata_page_info_t element indicates
+// the ownership and data type of its corresponding metadata page.
+//
+// For simplicity, the monitor implementation assumes that the
+// metadata_page_info_t array fits into a single DRAM regon stripe. The boot
+// initialization sequence ensures that the invariant holds.
+
 namespace sanctum {
 namespace internal {
 
+using sanctum::api::enclave_id_t;
 using sanctum::bare::phys_ptr;
 using sanctum::bare::uintptr_t;
 

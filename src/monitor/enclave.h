@@ -59,11 +59,15 @@ struct mailbox_t {
 //
 // This is synchronized by the lock of the enclave's main DRAM region.
 struct enclave_info_t {
-  // The base of the enclave's virtual address range.
-  uintptr_t ev_base;
-
-  // The mask of the enclave's virtual address range.
-  uintptr_t ev_mask;
+  // Protects this structure from data races.
+  //
+  // This lock must be acquired before accessing any field except for
+  // running_threads. See the running_threads documentation for details.
+  //
+  // This lock should be acquired using lock_enclave_info(), which guarantees
+  // that the enclave_info_t is valid at lock acquisition time by holding the
+  // metadata region's lock while acquiring the enclave's lock.
+  atomic_flag lock;
 
   // Number of mailbox_t structures following the thread_slot_t structures.
   size_t mailbox_count;
@@ -74,6 +78,12 @@ struct enclave_info_t {
 
   // non-zero for debug enclaves.
   size_t is_debug;
+
+  // The base of the enclave's virtual address range.
+  uintptr_t ev_base;
+
+  // The mask of the enclave's virtual address range.
+  uintptr_t ev_mask;
 
   // Physical address of the enclave's page table base during loading.
   //
@@ -86,8 +96,11 @@ struct enclave_info_t {
 
   // Number of enclave threads running on cores.
   //
-  // This field is only incremented while the enclave lock is held. However, it
-  // is decremented without holding the enclave lock, in enclave exits.
+  // This field can only be incremented while the enclave lock is held.
+  // However, it can be decremented without holding the enclave lock, in
+  // enclave exits. This is sufficient to create a safe point at which an
+  // enclave can be killed -- if the enclave's lock is held and this field is
+  // zero, no thread will start running until the enclave's lock is released.
   atomic<size_t> running_threads;
 
   // The enclave's measurement hash.

@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 
 using sanctum::api::enclave_id_t;
+using sanctum::bare::is_power_of_two;
 using sanctum::bare::page_size;
 using sanctum::internal::empty_metadata_page_type;
 using sanctum::internal::enclave_metadata_page_type;
@@ -15,6 +16,8 @@ using sanctum::internal::thread_metadata_page_type;
 
 
 TEST(MetadataPageInfo, SizeAndMasks) {
+  static_assert(is_power_of_two(sizeof(metadata_page_info_t)),
+      "metadata_page_info_t's size must be a power of two");
   static_assert(sizeof(metadata_page_info_t) >= sizeof(enclave_id_t),
       "metadata_page_info_t must be able to hold an enclave_id_t");
 
