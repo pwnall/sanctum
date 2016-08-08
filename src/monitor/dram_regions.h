@@ -98,6 +98,12 @@ extern size_t g_dram_region_count;
 // The stripe size is always (1 << g_dram_region_shift).
 extern size_t g_dram_stripe_size;
 
+// The number of pages in a DRAM stripe.
+//
+// This number is always g_dram_stripe_size >> page_shift(), which is
+// equivalent to (1 << (g_dram_region_shift - page_shift())).
+extern size_t g_dram_stripe_pages;
+
 // The size of a DRAM region bitmap, in units of sizeof(size_t).
 //
 // This is ceil(g_dram_region_count / (sizeof(size_t) * 8)).

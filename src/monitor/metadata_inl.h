@@ -11,10 +11,26 @@
 namespace sanctum {
 namespace internal {  // sanctum::internal
 
+using sanctum::api::api_result_t;
 using sanctum::api::mailbox_id_t;
+using sanctum::api::monitor_concurrent_call;
+using sanctum::api::monitor_invalid_state;
+using sanctum::api::monitor_invalid_value;
+using sanctum::api::monitor_ok;
 using sanctum::api::null_enclave_id;
 using sanctum::bare::is_page_aligned;
 using sanctum::bare::pages_needed_for;
+
+constexpr inline metadata_page_info_t metadata_page_info(enclave_id_t owner,
+    metadata_page_info_t page_type) {
+  return static_cast<metadata_page_info_t>(owner) | page_type;
+}
+
+// The value used to indicate empty pages.
+//
+// This must be zero.
+constexpr metadata_page_info_t empty_metadata_page_info =
+    metadata_page_info(null_enclave_id, empty_metadata_page_type);
 
 // Initializes a DRAM region to be used as a metadata region.
 //
@@ -31,30 +47,65 @@ inline void init_metadata_region(size_t dram_region) {
   bzero(metadata_map, g_metadata_region_start << page_shift());
 }
 
-// Locks the metadata region corresponding to a metadata page address.
+// Attempts to locks the metadata region for a metadata page address.
 //
-// Returns null if the address is not a valid metadata page address.
-inline phys_ptr<dram_region_info_t>
-    lock_metadata_region_for(uintptr_t phys_addr) {
+// Returns a monitor API call error code. If the code is not monitor_ok, it can
+// be passed as-is to the caller. This can happen if the given address is not a
+// valid metadata page address, or if the metadata region is locked.
+//
+// If this succeeds, it sets dram_region to the DRAM region index of the
+// metadata region that the given address belongs to.
+inline api_result_t lock_metadata_region_for(uintptr_t phys_addr,
+    size_t& dram_region) {
   if (!is_page_aligned(phys_addr) || !is_dram_address(phys_addr))
-    return phys_ptr<dram_region_info_t>::null();
+    return monitor_invalid_value;
 
-  const size_t dram_region = dram_region_for(phys_addr);
+  dram_region = dram_region_for(phys_addr);
   if (test_and_set_dram_region_lock(dram_region))
-    return phys_ptr<dram_region_info_t>::null();
+    return monitor_concurrent_call;
 
   phys_ptr<dram_region_info_t> region = &g_dram_region[dram_region];
   if (region->*(&dram_region_info_t::owner) != metadata_enclave_id) {
     clear_dram_region_lock(dram_region);
-    return phys_ptr<dram_region_info_t>::null();
+    return monitor_invalid_state;
   }
-  return region;
+  return monitor_ok;
 }
 
 inline phys_ptr<metadata_page_info_t> metadata_page_info_for(
     uintptr_t phys_addr) {
-  return phys_ptr<metadata_page_info_t>{dram_region_start(phys_addr)} +
+  return phys_ptr<metadata_page_info_t>{phys_addr & g_dram_region_mask} +
       dram_region_page_for(phys_addr);
+}
+
+// Attempts to allocate pages for a metadata structure.
+//
+// The caller must ensure that phys_addr falls into a metadata region, and must
+// hold the lock for that DRAM region. The caller must not release the DRAM
+// region lock until it finishes setting up the metadata structure.
+//
+// Returns a monitor API call error code. If the code is not monitor_ok, it can
+// be passed as-is to the caller. This can happen if the metadata region does
+// not have enough continuous pages for the structure, or if any of the
+// metadata pages are allocated to something else.
+inline api_result_t alloc_metadata_item(uintptr_t phys_addr, size_t page_count,
+    enclave_id_t owner, metadata_page_info_t type) {
+
+  if (dram_stripe_page_for(phys_addr) + page_count > g_dram_stripe_pages)
+    return monitor_invalid_value;
+
+  phys_ptr<metadata_page_info_t> page_info = metadata_page_info_for(phys_addr);
+  for (size_t i = 0; i < page_count; ++i) {
+    if (page_info[i]) return monitor_invalid_state;
+  }
+
+  *page_info = metadata_page_info(owner, type);
+
+  metadata_page_info_t inner_page_info =
+      metadata_page_info(owner, inner_metadata_page_type);
+  for (size_t i = 1; i < page_count; ++i, page_info += 1)
+    *page_info = inner_metadata_page_type;
+  return monitor_ok;
 }
 
 // Computes the physical address of an enclave's DRAM region bitmap.

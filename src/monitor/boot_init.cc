@@ -99,6 +99,7 @@ void boot_init_dram_regions() {
   g_dram_stripe_shift = g_dram_region_shift + region_bits;
 
   g_dram_stripe_size = 1 << g_dram_region_shift;
+  g_dram_stripe_pages = 1 << stripe_page_bits;
   g_dram_region_count = 1 << region_bits;
 
   g_dram_stripe_page_mask = ((1 << stripe_page_bits) - 1) << page_shift();

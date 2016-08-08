@@ -62,6 +62,7 @@ size_t g_dram_region_mask;
 size_t g_dram_stripe_mask;
 size_t g_dram_region_count;
 size_t g_dram_stripe_size;
+size_t g_dram_stripe_pages;
 size_t g_dram_region_bitmap_words;
 size_t g_dma_range_start;
 size_t g_dma_range_end;

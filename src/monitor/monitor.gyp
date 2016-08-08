@@ -56,6 +56,7 @@
         'boot_init_test.cc',
         'dram_regions_inl_test.cc',
         'enclave_inl_test.cc',
+        'measure_inl_test.cc',
         'metadata_inl_test.cc',
       ],
       'dependencies': [

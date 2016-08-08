@@ -1,5 +1,6 @@
 #include "boot_init.h"
 
+#include "bare/bit_masking.h"
 #include "bare/cpu_context.h"
 #include "bare/memory.h"
 #include "bare/page_tables.h"
@@ -11,6 +12,7 @@
 #include "gtest/gtest.h"
 
 using sanctum::bare::current_core;
+using sanctum::bare::is_power_of_two;
 using sanctum::bare::page_size;
 using sanctum::bare::page_shift;
 using sanctum::bare::phys_ptr;
@@ -32,8 +34,10 @@ using sanctum::internal::g_dram_region_mask;
 using sanctum::internal::g_dram_region_shift;
 using sanctum::internal::g_dram_size;
 using sanctum::internal::g_dram_stripe_mask;
+using sanctum::internal::g_dram_stripe_pages;
 using sanctum::internal::g_dram_stripe_page_mask;
 using sanctum::internal::g_dram_stripe_shift;
+using sanctum::internal::g_dram_stripe_size;
 using sanctum::internal::g_metadata_region_pages;
 using sanctum::internal::g_metadata_region_start;
 using sanctum::internal::g_monitor_top;
@@ -95,12 +99,19 @@ void check_dram_geometry_invariants() {
   }
 
   // The counts must match the masks.
+  ASSERT_EQ(is_power_of_two(g_dram_region_count), true);
   ASSERT_EQ((g_dram_region_mask >> g_dram_region_shift) + 1,
       g_dram_region_count);
 
   // The masks must combine to cover all the DRAM address bits.
   ASSERT_EQ(page_mask | g_dram_stripe_page_mask | g_dram_region_mask |
       g_dram_stripe_mask, g_dram_size - 1);
+
+  // The sizes must match the shifts.
+  ASSERT_EQ(is_power_of_two(g_dram_stripe_size), true);
+  ASSERT_EQ(is_power_of_two(g_dram_stripe_pages), true);
+  ASSERT_EQ(g_dram_stripe_size, 1 << g_dram_region_shift);
+  ASSERT_EQ(g_dram_stripe_size >> page_shift(), g_dram_stripe_pages);
 }
 
 };  // anonymous namespace
