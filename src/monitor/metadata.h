@@ -42,9 +42,12 @@ constexpr metadata_page_info_t metadata_page_type_mask = 3;
 // software.
 constexpr metadata_page_info_t empty_metadata_page_type = 0;
 
-// Type for metadata pages that store inner pages for data structures. The
-// first page of each data structure has a type that identifies the data
-// structure.
+// Type for metadata pages that store inner pages for data structures.
+//
+// The first page of each data structure has a type that identifies the data
+// structure. The other pages use the inner type. This way, we can check that
+// an address points to the beginning of a metadata structure by comparing the
+// page's type against the expected structure type.
 constexpr metadata_page_info_t inner_metadata_page_type = 1;
 
 // Type for metadata pages that hold an enclave's enclave_info_t.

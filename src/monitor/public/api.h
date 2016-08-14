@@ -177,8 +177,6 @@ typedef struct {
   //
   // The EPTBR contains the physical address of the enclave's page table base.
   uintptr_t eptbr;
-
-  //enclave_exit_state_t exit_state;
 } thread_info_t;
 
 //
@@ -274,8 +272,8 @@ size_t enclave_metadata_pages(size_t mailbox_count);
 // Creates an enclave's metadata structure.
 //
 // `enclave_id` must be the physical address of the first page in a sequence of
-// free pages in the same DRAM metadata region. It becomes the enclave's ID
-// used for subsequent API calls. The required number of free metadata pages
+// free pages in the same DRAM metadata region stripe. It becomes the enclave's
+// ID used for subsequent API calls. The required number of free metadata pages
 // can be obtained by calling `enclave_metadata_pages`.
 //
 // `ev_base` and `ev_mask` indicate the range of enclave virtual addresses. The
@@ -329,18 +327,36 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
 //
 // `enclave_id` must be an enclave that has not yet been initialized.
 //
-// `thread_id` must be smaller than the enclave's maximum thread count, and
-// must not be used by another hardware thread.
+// `thread_id` must be the physical address of the first page in a sequence of
+// free pages in the same DRAM metadata region stripe. It becomes the thread's
+// ID used for subsequent API calls. The required number of free metadata pages
+// can be obtained by calling `thread_metadata_pages`.
 //
-// `virtual_addr` must point to thread_public_info_pages() pages of virtual
-// memory that was previously initialized by calling load_enclave_page(). The
-// address must be page-aligned.
+// `entry_pc`, `entry_stack`, `fault_pc` and `fault_stack` are virtual
+// addresses in the enclave's address space. They are used to set the
+// corresponding fields in thread_info_t.
 //
-// The virtual memory buffer pointed by `virtual_addr` must map to a contiguous
-// range of physical memory pages that belong to the same DRAM region,
-// otherwise the API call will return monitor_unsupported.
+// This must be called after the enclave's root page table is set by a call to
+// load_enclave_page_table().
 api_result_t load_enclave_thread(enclave_id_t enclave_id,
-    thread_id_t thread_id, uintptr_t virtual_addr);
+    thread_id_t thread_id, uintptr_t entry_pc, uintptr_t entry_stack,
+    uintptr_t fault_pc, uintptr_t fault_stack);
+
+// Allocates a thread metadata structure to be used by an enclave.
+//
+// `thread_id` must be the physical address of the first page in a sequence of
+// free pages in the same DRAM metadata region. It becomes the enclave's ID
+// used for subsequent API calls. The required number of free metadata pages
+// can be obtained by calling `enclave_metadata_pages`.
+//
+// `enclave_id` must be an enclave that has been initialized and has not yet
+// been killed.
+//
+// `phys_addr` is the physical address of a range of pages that will hold the
+// thread_info_t structure. The address must be page-aligned, and must not
+// overlap with the pages used by the monitor.
+api_result_t assign_enclave_thread(enclave_id_t enclave_id,
+    thread_id_t thread_id);
 
 // Marks the given enclave as initialized and ready to execute.
 //
@@ -359,10 +375,10 @@ api_result_t init_enclave(enclave_id_t enclave_id);
 // executing on any core.
 api_result_t enter_enclave(enclave_id_t enclave_id, thread_id_t thread_id);
 
-// Frees up all DRAM regions associated with an enclave.
+// Frees up all DRAM regions and the metadata associated with an enclave.
 //
-// This can only be called when no enclave thread is running on any core. The
-// API wipes the DRAM regions belonging to the enclave and marks them as free.
+// This can only be called when there is no thread metadata associated with the
+// enclave.
 api_result_t delete_enclave(enclave_id_t enclave_id);
 
 // Reads/writes a page from/to a debug enclave's memory.

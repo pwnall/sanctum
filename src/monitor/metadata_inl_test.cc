@@ -13,6 +13,7 @@ using sanctum::internal::enclave_metadata_page_type;
 using sanctum::internal::inner_metadata_page_type;
 using sanctum::internal::metadata_page_info;
 using sanctum::internal::metadata_page_info_t;
+using sanctum::internal::metadata_page_info_type;
 using sanctum::internal::metadata_page_type_mask;
 using sanctum::internal::thread_metadata_page_type;
 
@@ -39,14 +40,22 @@ TEST(MetadataPageInfo, SizeAndMasks) {
 }
 
 TEST(MetadataPageInfo, MetadataPageInfo) {
-  static_assert(metadata_page_info(static_cast<enclave_id_t>(0xAA0000),
-      static_cast<metadata_page_info_t>(0x3)) ==
-      static_cast<metadata_page_info_t>(0xAA0003),
+  static_assert(metadata_page_info(0xAA0000, 0x3) == 0xAA0003,
       "incorrect metadata_page_info implementation");
 }
 
 TEST(MetadataPageInfo, EmptyMetadataPageInfo) {
-  static_assert(empty_metadata_page_info ==
-      static_cast<metadata_page_info_t>(0),
+  static_assert(empty_metadata_page_info == 0,
       "empty_metadata_page_info must be zero");
+}
+
+TEST(MetadataPageInfo, MetadataPageInfoType) {
+  static_assert(metadata_page_info_type(0xFFF000) == 0,
+      "incorrect metadata_page_info_type implementation");
+  static_assert(metadata_page_info_type(0xEFE001) == 1,
+      "incorrect metadata_page_info_type implementation");
+  static_assert(metadata_page_info_type(0xEEE0002) == 2,
+      "incorrect metadata_page_info_type implementation");
+  static_assert(metadata_page_info_type(0xAA0003) == 3,
+      "incorrect metadata_page_info_type implementation");
 }

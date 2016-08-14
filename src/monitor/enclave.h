@@ -23,10 +23,28 @@ using sanctum::crypto::hash_state_t;
 
 // The per-thread information stored in metadata regions.
 struct thread_metadata_t {
-  // We store the information used to create the thread as-is for simplicity.
-  // thread_metadata_t is a monitor implementation detail, so its layout can
-  // change later, if that makes sense.
-  thread_info_t thread_info;
+  // Protects this structure from data races.
+  //
+  // This lock should be acquired using lock_thread_metadata(), which
+  // guarantees that the thread_metadata_t is valid at lock acquisition time by
+  // holding the metadata region's lock while acquiring the thread's lock.
+  atomic_flag lock;
+
+  // The fields below get initialized from thread_info_t.
+
+  // The virtual address of the thread's entry point.
+  uintptr_t entry_pc;
+  // The virtual address of the thread's stack top.
+  uintptr_t entry_stack;
+  // The virtual address of the thread's fault handler.
+  uintptr_t fault_pc;
+  // The virtual address of the fault handler's stack top.
+  uintptr_t fault_stack;
+
+  // The EPTBR value to be loaded for this thread.
+  //
+  // The EPTBR contains the physical address of the enclave's page table base.
+  uintptr_t eptbr;
 
   register_state_t exit_state;  // enter_enclave caller state
   register_state_t aex_state;   // enclave state saved on AEX
@@ -61,9 +79,6 @@ struct mailbox_t {
 struct enclave_info_t {
   // Protects this structure from data races.
   //
-  // This lock must be acquired before accessing any field except for
-  // running_threads. See the running_threads documentation for details.
-  //
   // This lock should be acquired using lock_enclave_info(), which guarantees
   // that the enclave_info_t is valid at lock acquisition time by holding the
   // metadata region's lock while acquiring the enclave's lock.
@@ -79,6 +94,16 @@ struct enclave_info_t {
   // non-zero for debug enclaves.
   size_t is_debug;
 
+  // Number of thread metadata structures assigned to the enclave.
+  //
+  // This must be zero for the enclave to be killed.
+  size_t thread_count;
+
+  // Number of DRAM regions assigned to the enclave.
+  //
+  // This must be zero for the enclave's metadata to be removed.
+  size_t dram_region_count;
+
   // The base of the enclave's virtual address range.
   uintptr_t ev_base;
 
@@ -93,15 +118,6 @@ struct enclave_info_t {
 
   // The phyiscal address of the last page loaded into the enclave by the OS.
   uintptr_t last_load_addr;
-
-  // Number of enclave threads running on cores.
-  //
-  // This field can only be incremented while the enclave lock is held.
-  // However, it can be decremented without holding the enclave lock, in
-  // enclave exits. This is sufficient to create a safe point at which an
-  // enclave can be killed -- if the enclave's lock is held and this field is
-  // zero, no thread will start running until the enclave's lock is released.
-  atomic<size_t> running_threads;
 
   // The enclave's measurement hash.
   //

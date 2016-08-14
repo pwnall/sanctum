@@ -78,7 +78,7 @@ api_result_t delete_enclave(enclave_id_t enclave_id) {
   }
 
   phys_ptr<enclave_info_t> enclave_info{enclave_id};
-  if (atomic_load(&(enclave_info->*(&enclave_info_t::running_threads))) != 0) {
+  if (enclave_info->*(&enclave_info_t::thread_count) != 0) {
     clear_dram_region_lock(dram_region);
     return monitor_invalid_state;
   }

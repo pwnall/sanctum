@@ -27,9 +27,8 @@ using sanctum::crypto::init_hash;
 // because every operation needs to set it.
 struct measurement_block_t {
   size_t opcode;
-  uintptr_t ptr1, ptr2;
+  uintptr_t ptr1, ptr2, ptr3, ptr4;
   size_t size1, size2;
-  thread_id_t thread1;
 };
 static_assert(sizeof(measurement_block_t) <= hash_block_size,
     "measurement_block_t does not fit in a hash block");
@@ -130,25 +129,29 @@ inline void extend_enclave_hash_with_page(
 //
 // The caller must hold the lock of the encalve's main DRAM region.
 inline void extend_enclave_hash_with_thread(
-    phys_ptr<enclave_info_t> enclave_info, thread_id_t thread_id,
-    uintptr_t virtual_addr) {
+    phys_ptr<enclave_info_t> enclave_info, uintptr_t entry_pc,
+    uintptr_t entry_stack, uintptr_t fault_pc, uintptr_t fault_stack) {
   phys_ptr<measurement_block_t> block =
       enclave_measurement_block(enclave_info);
-  block->*(&measurement_block_t::opcode) = load_enclave_page_opcode;
-  block->*(&measurement_block_t::ptr1) = virtual_addr;
-  block->*(&measurement_block_t::thread1) = thread_id;
+  block->*(&measurement_block_t::opcode) = load_enclave_thread_opcode;
+  block->*(&measurement_block_t::ptr1) = entry_pc;
+  block->*(&measurement_block_t::ptr2) = entry_stack;
+  block->*(&measurement_block_t::ptr3) = fault_pc;
+  block->*(&measurement_block_t::ptr4) = fault_stack;
 
   extend_hash(&(enclave_info->*(&enclave_info_t::hash)),
       enclave_info->*(&enclave_info_t::hash_block));
   block->*(&measurement_block_t::ptr1) = 0;
-  block->*(&measurement_block_t::thread1) = 0;
+  block->*(&measurement_block_t::ptr2) = 0;
+  block->*(&measurement_block_t::ptr3) = 0;
+  block->*(&measurement_block_t::ptr4) = 0;
 }
 
 // Finalizes the enclave's measurement hash.
 inline void finalize_enclave_hash(phys_ptr<enclave_info_t> enclave_info) {
   phys_ptr<measurement_block_t> block =
       enclave_measurement_block(enclave_info);
-  block->*(&measurement_block_t::opcode) = load_enclave_page_opcode;
+  block->*(&measurement_block_t::opcode) = finalize_enclave_opcode;
 
   extend_hash(&(enclave_info->*(&enclave_info_t::hash)),
       enclave_info->*(&enclave_info_t::hash_block));

@@ -3,6 +3,7 @@
 
 #include "bare/base_types.h"
 #include "bare/bit_masking.h"
+#include "bare/phys_atomics.h"
 #include "bare/phys_ptr.h"
 #include "dram_regions_inl.h"
 #include "enclave.h"
@@ -20,7 +21,10 @@ using sanctum::api::monitor_ok;
 using sanctum::api::null_enclave_id;
 using sanctum::bare::is_page_aligned;
 using sanctum::bare::pages_needed_for;
+using sanctum::bare::atomic_flag_clear;
+using sanctum::bare::atomic_flag_test_and_set;
 
+// Assembles metadata page information from an enclave ID and a page type.
 constexpr inline metadata_page_info_t metadata_page_info(enclave_id_t owner,
     metadata_page_info_t page_type) {
   return static_cast<metadata_page_info_t>(owner) | page_type;
@@ -31,6 +35,12 @@ constexpr inline metadata_page_info_t metadata_page_info(enclave_id_t owner,
 // This must be zero.
 constexpr metadata_page_info_t empty_metadata_page_info =
     metadata_page_info(null_enclave_id, empty_metadata_page_type);
+
+// Extracts the metadata page type from an entry in the metadata info map.
+constexpr inline metadata_page_info_t metadata_page_info_type(
+    metadata_page_info_t metadata_page_info) {
+  return metadata_page_info & metadata_page_type_mask;
+}
 
 // Initializes a DRAM region to be used as a metadata region.
 //
@@ -78,19 +88,28 @@ inline phys_ptr<metadata_page_info_t> metadata_page_info_for(
       dram_region_page_for(phys_addr);
 }
 
-// Attempts to allocate pages for a metadata structure.
+// Attempts to assign pages for use by a metadata structure.
 //
 // The caller must ensure that phys_addr falls into a metadata region, and must
 // hold the lock for that DRAM region. The caller must not release the DRAM
 // region lock until it finishes setting up the metadata structure.
 //
+// Invalid values for phys_addr or page_count will be handled correctly and
+// result in error codes. Invalid values for owner or type will result in an
+// inconsistent metadata map, which can lead to security vulnerabilities.
+//
+// `free_info` must be empty_metadata_page_info when the pages to be assigned
+// are expected to be , or
+// metadata_page_info(owner, empty_metadata_page_type).
+//
 // Returns a monitor API call error code. If the code is not monitor_ok, it can
-// be passed as-is to the caller. This can happen if the metadata region does
-// not have enough continuous pages for the structure, or if any of the
-// metadata pages are allocated to something else.
-inline api_result_t alloc_metadata_item(uintptr_t phys_addr, size_t page_count,
-    enclave_id_t owner, metadata_page_info_t type) {
-
+// be passed as-is to the caller. This can happen if the physical address does
+// not point into a metadata region, if the metadata region does not have
+// enough continuous pages for the structure, or if any of the metadata pages
+// are not free.
+inline api_result_t assign_metadata_pages(uintptr_t phys_addr,
+    size_t page_count, enclave_id_t owner, metadata_page_info_t type,
+    metadata_page_info_t free_info) {
   if (dram_stripe_page_for(phys_addr) + page_count > g_dram_stripe_pages)
     return monitor_invalid_value;
 
@@ -101,11 +120,101 @@ inline api_result_t alloc_metadata_item(uintptr_t phys_addr, size_t page_count,
 
   *page_info = metadata_page_info(owner, type);
 
-  metadata_page_info_t inner_page_info =
+  const metadata_page_info_t inner_page_info =
       metadata_page_info(owner, inner_metadata_page_type);
   for (size_t i = 1; i < page_count; ++i, page_info += 1)
     *page_info = inner_metadata_page_type;
   return monitor_ok;
+}
+
+// Attempts to reserve free pages for use by a metadata structure.
+//
+// The caller must ensure that phys_addr falls into a metadata region, and must
+// hold the lock for that DRAM region. The caller must not release the DRAM
+// region lock until it finishes setting up the metadata structure.
+//
+// Invalid values for phys_addr or page_count will be handled correctly and
+// result in error codes. Invalid values for owner or type will result in an
+// inconsistent metadata map, which can lead to security vulnerabilities.
+//
+// `free_info` must be empty_metadata_page_info when the pages to be assigned
+// are expected to be free, or
+//
+// Returns a monitor API call error code. If the code is not monitor_ok, it can
+// be passed as-is to the caller. This can happen if the physical address does
+// not point into a metadata region, if the metadata region does not have
+// enough continuous pages for the structure, or if any of the metadata pages
+// are not free.
+inline api_result_t reserve_metadata_pages(uintptr_t phys_addr,
+    size_t page_count, enclave_id_t owner, metadata_page_info_t type) {
+  return assign_metadata_pages(phys_addr, page_count, owner, type,
+      empty_metadata_page_type);
+}
+
+// Accepts pages allocated to an enclave for use by a metadata structure.
+//
+// The caller must ensure that phys_addr falls into a metadata region, and must
+// hold the lock for that DRAM region. The caller must not release the DRAM
+// region lock until it finishes setting up the metadata structure.
+//
+// Invalid values for phys_addr or page_count will be handled correctly and
+// result in error codes. Invalid values for owner or type will result in an
+// inconsistent metadata map, which can lead to security vulnerabilities.
+//
+// Returns a monitor API call error code. If the code is not monitor_ok, it can
+// be passed as-is to the caller. This can happen if the physical address does
+// not point into a metadata region, if the metadata region does not have
+// enough continuous pages for the structure, or if any of the metadata pages
+// are not free.
+inline api_result_t accept_metadata_pages(uintptr_t phys_addr,
+    size_t page_count, enclave_id_t owner, metadata_page_info_t type) {
+  return assign_metadata_pages(phys_addr, page_count, owner, type,
+      metadata_page_info(owner, empty_metadata_page_type));
+}
+
+// Attempts to lock an enclave's metadata structure.
+//
+// Invalid values for enclave_id will be handled correctly and result in error
+// codes.
+//
+// Returns a monitor API call error code. If the code is not monitor_ok, it can
+// be passed as-is to the caller. This can happen if the enclave ID is invalid,
+// or if the enclave is already locked.
+inline api_result_t lock_enclave(enclave_id_t enclave_id) {
+  if (!is_dram_address(enclave_id) || !is_page_aligned(enclave_id))
+    return monitor_invalid_value;
+
+  size_t dram_region;
+  api_result_t result = lock_metadata_region_for(enclave_id, dram_region);
+  if (result != monitor_ok)
+    return result;
+
+  // NOTE: If we got here, result must equal monitor_ok.
+  phys_ptr<metadata_page_info_t> page_info = metadata_page_info_for(
+      enclave_id);
+  if (*page_info !=
+      metadata_page_info(enclave_id, enclave_metadata_page_type)) {
+    result = monitor_invalid_value;
+  } else {
+    const phys_ptr<enclave_info_t> enclave_info{enclave_id};
+    if (atomic_flag_test_and_set(&(enclave_info->*(&enclave_info_t::lock))))
+      result = monitor_concurrent_call;
+  }
+
+  clear_dram_region_lock(dram_region);
+  return result;
+}
+
+// Unlocks an enclave's metadata structure.
+//
+// The caller must have acquired a lock on the enclave's metadata via a call to
+// lock_enclave().
+//
+// Incorrect enclave IDs will cause memory trashing. Unlocking an already
+// unlocked enclave is a security error
+inline void unlock_enclave(enclave_id_t enclave_id) {
+  const phys_ptr<enclave_info_t> enclave_info{enclave_id};
+  atomic_flag_clear(&(enclave_info->*(&enclave_info_t::lock)));
 }
 
 // Computes the physical address of an enclave's DRAM region bitmap.

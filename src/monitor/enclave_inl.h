@@ -7,6 +7,7 @@
 #include "bare/phys_ptr.h"
 #include "dram_regions.h"
 #include "enclave.h"
+#include "measure_inl.h"
 
 namespace sanctum {
 namespace internal {
@@ -88,6 +89,25 @@ inline uintptr_t walk_page_tables(uintptr_t ptb, uintptr_t virtual_addr) {
   if (!is_valid_page_table_entry(entry_addr, 0))
     return 0;
   return page_table_entry_target(entry_addr, 0);
+}
+
+// Initializes an enclave's metadata structure.
+//
+// The caller is responsible for validating all input parameters. The caller
+// must also hold the lock for the metadata region of the enclave metadata.
+inline void init_enclave_info(phys_ptr<enclave_info_t> enclave_info,
+    uintptr_t ev_base, uintptr_t ev_mask, size_t mailbox_count, bool debug) {
+  atomic_flag_clear(&(enclave_info->*(&enclave_info_t::lock)));
+  enclave_info->*(&enclave_info_t::mailbox_count) = mailbox_count;
+  enclave_info->*(&enclave_info_t::is_initialized) = 0;
+  enclave_info->*(&enclave_info_t::is_debug) = debug;
+  enclave_info->*(&enclave_info_t::ev_base) = ev_base;
+  enclave_info->*(&enclave_info_t::ev_mask) = ev_mask;
+  enclave_info->*(&enclave_info_t::load_eptbr) = 0;
+  enclave_info->*(&enclave_info_t::last_load_addr) = 0;
+  enclave_info->*(&enclave_info_t::thread_count) = 0;
+  enclave_info->*(&enclave_info_t::dram_region_count) = 0;
+  init_enclave_hash(enclave_info, ev_base, ev_mask, mailbox_count, debug);
 }
 
 };  // namespace sanctum::internal
