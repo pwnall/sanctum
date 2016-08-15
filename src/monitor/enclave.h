@@ -11,7 +11,7 @@ namespace sanctum {
 namespace internal {
 
 using sanctum::api::enclave_id_t;
-using sanctum::api::enclave::thread_info_t;
+using sanctum::api::enclave::thread_init_info_t;
 using sanctum::bare::atomic;
 using sanctum::bare::atomic_flag;
 using sanctum::bare::phys_ptr;
@@ -22,15 +22,15 @@ using sanctum::crypto::hash_block_size;
 using sanctum::crypto::hash_state_t;
 
 // The per-thread information stored in metadata regions.
-struct thread_metadata_t {
+struct thread_info_t {
   // Protects this structure from data races.
   //
   // This lock should be acquired using lock_thread_metadata(), which
-  // guarantees that the thread_metadata_t is valid at lock acquisition time by
+  // guarantees that the thread_info_t is valid at lock acquisition time by
   // holding the metadata region's lock while acquiring the thread's lock.
   atomic_flag lock;
 
-  // The fields below get initialized from thread_info_t.
+  // The fields below get initialized from thread_init_info_t.
 
   // The virtual address of the thread's entry point.
   uintptr_t entry_pc;
@@ -112,8 +112,8 @@ struct enclave_info_t {
 
   // Physical address of the enclave's page table base during loading.
   //
-  // This is set by the first load_enclave_page_table() call, and forced as the
-  // EPTBR value for enclave threads created by load_enclave_thread.
+  // This is set by the first load_page_table() call, and forced as the
+  // EPTBR value for enclave threads created by load_thread.
   uintptr_t load_eptbr;
 
   // The phyiscal address of the last page loaded into the enclave by the OS.

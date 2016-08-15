@@ -54,6 +54,8 @@
       'sources': [
         '<@(monitor_sources)',
         'boot_init_test.cc',
+        'cpu_core_inl_test.cc',
+        'cpu_core_test.cc',
         'dram_regions_inl_test.cc',
         'enclave_inl_test.cc',
         'measure_inl_test.cc',

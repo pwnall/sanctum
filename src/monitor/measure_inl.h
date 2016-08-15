@@ -35,9 +35,9 @@ static_assert(sizeof(measurement_block_t) <= hash_block_size,
 
 // Opcodes for enclave operations.
 constexpr size_t enclave_init_opcode = 0xAAAAAAAA;
-constexpr size_t load_enclave_page_table_opcode = 0xBBBBBBBB;
-constexpr size_t load_enclave_page_opcode = 0xCCCCCCCC;
-constexpr size_t load_enclave_thread_opcode = 0xDDDDDDDD;
+constexpr size_t load_page_table_opcode = 0xBBBBBBBB;
+constexpr size_t load_page_opcode = 0xCCCCCCCC;
+constexpr size_t load_thread_opcode = 0xDDDDDDDD;
 constexpr size_t finalize_enclave_opcode = 0xEEEEEEEE;
 
 // Computes the address of an enclave's buffer for measurement hashing.
@@ -86,7 +86,7 @@ inline void extend_enclave_hash_with_page_table(
     size_t level, uintptr_t acl) {
   phys_ptr<measurement_block_t> block =
       enclave_measurement_block(enclave_info);
-  block->*(&measurement_block_t::opcode) = load_enclave_page_table_opcode;
+  block->*(&measurement_block_t::opcode) = load_page_table_opcode;
   block->*(&measurement_block_t::ptr1) = virtual_addr;
   block->*(&measurement_block_t::ptr2) = acl;
   block->*(&measurement_block_t::size1) = level;
@@ -109,7 +109,7 @@ inline void extend_enclave_hash_with_page(
     uintptr_t acl, uintptr_t phys_addr) {
   phys_ptr<measurement_block_t> block =
       enclave_measurement_block(enclave_info);
-  block->*(&measurement_block_t::opcode) = load_enclave_page_opcode;
+  block->*(&measurement_block_t::opcode) = load_page_opcode;
   block->*(&measurement_block_t::ptr1) = virtual_addr;
   block->*(&measurement_block_t::ptr2) = acl;
 
@@ -133,7 +133,7 @@ inline void extend_enclave_hash_with_thread(
     uintptr_t entry_stack, uintptr_t fault_pc, uintptr_t fault_stack) {
   phys_ptr<measurement_block_t> block =
       enclave_measurement_block(enclave_info);
-  block->*(&measurement_block_t::opcode) = load_enclave_thread_opcode;
+  block->*(&measurement_block_t::opcode) = load_thread_opcode;
   block->*(&measurement_block_t::ptr1) = entry_pc;
   block->*(&measurement_block_t::ptr2) = entry_stack;
   block->*(&measurement_block_t::ptr3) = fault_pc;

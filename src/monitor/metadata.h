@@ -53,7 +53,7 @@ constexpr metadata_page_info_t inner_metadata_page_type = 1;
 // Type for metadata pages that hold an enclave's enclave_info_t.
 constexpr metadata_page_info_t enclave_metadata_page_type = 2;
 
-// Type for metadata pages that hold a thread_metadata_t for an enclave.
+// Type for metadata pages that hold a thread_info_t for an enclave.
 constexpr metadata_page_info_t thread_metadata_page_type = 3;
 
 // Total number of metadata pages in a DRAM region dedicated to metadata.

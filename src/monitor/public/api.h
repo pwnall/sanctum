@@ -109,14 +109,14 @@ api_result_t dram_region_check_ownership(size_t dram_region);
 // Allocates a thread info slot.
 //
 // `phys_addr` is the physical address of a range of pages that will hold the
-// thread_info_t structure. The address must be page-aligned, and must not
+// thread_init_info_t structure. The address must be page-aligned, and must not
 // overlap with the pages used by the monitor.
-api_result_t create_enclave_thread(thread_id_t thread_id, uintptr_t phys_addr);
+api_result_t accept_thread(thread_id_t thread_id, uintptr_t thread_info_addr);
 
 // Deallocates a thread info slot.
 //
 // The thread must not be running on any core.
-api_result_t delete_enclave_thread(thread_id_t thread_id);
+api_result_t delete_thread(thread_id_t thread_id);
 
 // Ends the currently running enclave thread and returns control to the OS.
 api_result_t exit_enclave();
@@ -177,7 +177,7 @@ typedef struct {
   //
   // The EPTBR contains the physical address of the enclave's page table base.
   uintptr_t eptbr;
-} thread_info_t;
+} thread_init_info_t;
 
 //
 typedef struct {
@@ -260,7 +260,7 @@ size_t metadata_region_pages();
 //
 // The beginning of each DRAM metadata region is reserved for the monitor's
 // use. This returns the first page number that can be used to store
-// enclave_info_t and thread_metadata_t structures.
+// enclave_info_t and thread_info_t structures.
 size_t metadata_region_start();
 
 // Returns the number of pages used by a thread metadata structure.
@@ -307,8 +307,8 @@ api_result_t create_enclave(enclave_id_t enclave_id, uintptr_t ev_base,
 //
 // `virtual_addr`, `level` and `acl` become a part of the enclave's
 // measurement.
-api_result_t load_enclave_page_table(enclave_id_t enclave_id,
-    uintptr_t phys_addr, uintptr_t virtual_addr, size_t level, uintptr_t acl);
+api_result_t load_page_table(enclave_id_t enclave_id, uintptr_t phys_addr,
+    uintptr_t virtual_addr, size_t level, uintptr_t acl);
 
 // Allocates and initializes a page in the enclave's main DRAM region.
 //
@@ -320,7 +320,7 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
 //
 // `virtual_addr`, `acl`, and the contents of the page at `os_addr` become a
 // part of the enclave's measurement.
-api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
+api_result_t load_page(enclave_id_t enclave_id, uintptr_t phys_addr,
     uintptr_t virtual_addr, uintptr_t os_addr, uintptr_t acl);
 
 // Creates a hardware thread in an enclave.
@@ -334,13 +334,13 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
 //
 // `entry_pc`, `entry_stack`, `fault_pc` and `fault_stack` are virtual
 // addresses in the enclave's address space. They are used to set the
-// corresponding fields in thread_info_t.
+// corresponding fields in thread_init_info_t.
 //
 // This must be called after the enclave's root page table is set by a call to
-// load_enclave_page_table().
-api_result_t load_enclave_thread(enclave_id_t enclave_id,
-    thread_id_t thread_id, uintptr_t entry_pc, uintptr_t entry_stack,
-    uintptr_t fault_pc, uintptr_t fault_stack);
+// load_page_table().
+api_result_t load_thread(enclave_id_t enclave_id, thread_id_t thread_id,
+    uintptr_t entry_pc, uintptr_t entry_stack, uintptr_t fault_pc,
+    uintptr_t fault_stack);
 
 // Allocates a thread metadata structure to be used by an enclave.
 //
@@ -353,10 +353,9 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
 // been killed.
 //
 // `phys_addr` is the physical address of a range of pages that will hold the
-// thread_info_t structure. The address must be page-aligned, and must not
+// thread_init_info_t structure. The address must be page-aligned, and must not
 // overlap with the pages used by the monitor.
-api_result_t assign_enclave_thread(enclave_id_t enclave_id,
-    thread_id_t thread_id);
+api_result_t assign_thread(enclave_id_t enclave_id, thread_id_t thread_id);
 
 // Marks the given enclave as initialized and ready to execute.
 //

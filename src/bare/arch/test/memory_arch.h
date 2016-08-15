@@ -53,7 +53,7 @@ template<typename T> inline void bzero(phys_ptr<T> start, size_t bytes) {
 
   phys_ptr<T> end = start + words;
   for (; start != end; start += 1)
-    *start = T{0};
+    *start = static_cast<T>(0);
 }
 template<typename T> inline void bcopy(phys_ptr<T> dest, phys_ptr<T> source,
     size_t bytes) {

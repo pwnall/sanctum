@@ -11,8 +11,12 @@
 namespace sanctum {
 namespace bare {  // sanctum::bare
 
+static_assert(sizeof(size_t) == sizeof(sizeof(size_t)),
+    "size_t incorrectly sized");
 static_assert(sizeof(uintptr_t) >= sizeof(void *), "uintptr_t too small");
+static_assert(sizeof(uint64_t) == 8, "uint64_t is not exactly 8 bytes");
 static_assert(sizeof(uint32_t) == 4, "uint32_t is not exactly 4 bytes");
+static_assert(sizeof(uint8_t) == 1, "uint8_t is not exactly one byte");
 
 };  // namespace sanctum::bare
 };  // namespace sanctum

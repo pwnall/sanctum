@@ -9,29 +9,30 @@ using sanctum::bare::uintptr_t;
 using sanctum::testing::phys_buffer;
 using sanctum::testing::phys_buffer_size;
 
-TEST(PhysPtrTest, HandlesUintptr) {
+TEST(PhysPtrTest, HandlesUint64) {
   constexpr uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
-  constexpr uintptr_t value = 0xbeef, write_value = 0xdeed;
+  constexpr uint64_t value = 0xdeadbeefbeefdead,
+      write_value = 0xbad0deeddeedbad0;
   constexpr uintptr_t zero_addr = 0;
   ASSERT_LE(256, phys_buffer_size);
   memset(phys_buffer, 0, 256);
-  *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)) = value;
+  *(reinterpret_cast<uint64_t*>(phys_buffer + addr)) = value;
 
-  phys_ptr<uintptr_t> ptr_addr{addr};
+  phys_ptr<uint64_t> ptr_addr{addr};
   ASSERT_EQ(addr, uintptr_t{ptr_addr});
   ASSERT_EQ(value, *ptr_addr);
 
-  phys_ptr<uintptr_t> ptr_copy_ctor{ptr_addr};
+  phys_ptr<uint64_t> ptr_copy_ctor{ptr_addr};
   ASSERT_EQ(addr, uintptr_t{ptr_copy_ctor});
   ASSERT_EQ(value, *ptr_copy_ctor);
 
-  phys_ptr<uintptr_t> ptr_assign_copy{zero_addr};
+  phys_ptr<uint64_t> ptr_assign_copy{zero_addr};
   ptr_assign_copy = ptr_addr;
   ASSERT_EQ(addr, uintptr_t{ptr_assign_copy});
   ASSERT_EQ(value, *ptr_assign_copy);
 
-  phys_ptr<uintptr_t> ptr_assign_move{zero_addr};
-  ptr_assign_move = phys_ptr<uintptr_t>(addr);
+  phys_ptr<uint64_t> ptr_assign_move{zero_addr};
+  ptr_assign_move = phys_ptr<uint64_t>(addr);
   ASSERT_EQ(addr, uintptr_t{ptr_assign_move});
   ASSERT_EQ(value, *ptr_assign_move);
 
@@ -40,20 +41,20 @@ TEST(PhysPtrTest, HandlesUintptr) {
   ASSERT_EQ(write_value, *ptr_addr);
   *ptr_addr = value;
 
-  phys_ref<uintptr_t> ref = *ptr_addr;
+  phys_ref<uint64_t> ref = *ptr_addr;
   ASSERT_EQ(&ref, ptr_addr);
 
-  *(reinterpret_cast<uintptr_t*>(phys_buffer + addr) + 1) = write_value;
+  *(reinterpret_cast<uint64_t*>(phys_buffer + addr) + 1) = write_value;
   ASSERT_EQ(value, ptr_addr[0]);
   ASSERT_EQ(write_value, ptr_addr[1]);
-  *(reinterpret_cast<uintptr_t*>(phys_buffer + addr) + 1) = 0;
+  *(reinterpret_cast<uint64_t*>(phys_buffer + addr) + 1) = 0;
   ptr_addr[2] = write_value;
   ASSERT_EQ(write_value,
-            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr) + 2));
+            *(reinterpret_cast<uint64_t*>(phys_buffer + addr) + 2));
   ptr_addr[2] = 0;
 
-  phys_ref<uintptr_t> other_ref = ptr_addr[1];
-  *(reinterpret_cast<uintptr_t*>(phys_buffer + addr) + 1) = write_value;
+  phys_ref<uint64_t> other_ref = ptr_addr[1];
+  *(reinterpret_cast<uint64_t*>(phys_buffer + addr) + 1) = write_value;
   *ptr_addr = ptr_addr[1];
   *ptr_addr = other_ref;
   ASSERT_EQ(write_value, ptr_addr[0]);
@@ -61,7 +62,7 @@ TEST(PhysPtrTest, HandlesUintptr) {
   *ptr_addr = value;
   ptr_addr[1] = 0;
 
-  *(reinterpret_cast<uintptr_t*>(phys_buffer + addr) + 1) = write_value;
+  *(reinterpret_cast<uint64_t*>(phys_buffer + addr) + 1) = write_value;
   *ptr_addr = ptr_addr[1];
   ASSERT_EQ(write_value, ptr_addr[0]);
   ASSERT_EQ(write_value, ptr_addr[1]);
@@ -69,77 +70,77 @@ TEST(PhysPtrTest, HandlesUintptr) {
   ptr_addr[1] = 0;
 
   ASSERT_EQ(true, ptr_addr == ptr_copy_ctor);
-  ASSERT_EQ(false, ptr_addr == phys_ptr<uintptr_t>{addr + 1});
+  ASSERT_EQ(false, ptr_addr == phys_ptr<uint64_t>{addr + 1});
 
   ASSERT_EQ(false, ptr_addr != ptr_copy_ctor);
-  ASSERT_EQ(true, ptr_addr != phys_ptr<uintptr_t>{addr + 1});
+  ASSERT_EQ(true, ptr_addr != phys_ptr<uint64_t>{addr + 1});
 
   ASSERT_EQ(&ptr_addr[16], ptr_addr + 16);
 
-  phys_ptr<uintptr_t> ptr_sum = ptr_addr;
+  phys_ptr<uint64_t> ptr_sum = ptr_addr;
   ptr_sum += 16;
   ASSERT_EQ(&ptr_addr[16], ptr_sum);
 
   ASSERT_EQ(&ptr_addr[8], ptr_sum - 8);
 
-  phys_ptr<uintptr_t> ptr_diff = ptr_sum;
+  phys_ptr<uint64_t> ptr_diff = ptr_sum;
   ptr_diff -= 8;
   ASSERT_EQ(&ptr_addr[8], ptr_diff);
 
   *ptr_addr += write_value;
   ASSERT_EQ(value + write_value,
-            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<uint64_t*>(phys_buffer + addr)));
   ASSERT_EQ(value + write_value, *ptr_addr);
   *ptr_addr = value;
 
   *ptr_addr -= write_value;
   ASSERT_EQ(value - write_value,
-            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<uint64_t*>(phys_buffer + addr)));
   ASSERT_EQ(value - write_value, *ptr_addr);
   *ptr_addr = value;
 
   static_assert(value != (value | write_value), "Invalid test setup.");
   *ptr_addr |= write_value;
   ASSERT_EQ(value | write_value,
-            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<uint64_t*>(phys_buffer + addr)));
   ASSERT_EQ(value | write_value, *ptr_addr);
   *ptr_addr = value;
 
   static_assert(value != (value & write_value), "Invalid test setup.");
   *ptr_addr &= write_value;
   ASSERT_EQ(value & write_value,
-            *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<uint64_t*>(phys_buffer + addr)));
   ASSERT_EQ(value & write_value, *ptr_addr);
   *ptr_addr = value;
 
-  ASSERT_EQ(0, uintptr_t{phys_ptr<uintptr_t*>::null()});
+  ASSERT_EQ(0, uintptr_t{phys_ptr<uint64_t*>::null()});
 
-  *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)) = 0;
+  *(reinterpret_cast<uint64_t*>(phys_buffer + addr)) = 0;
 }
 
-TEST(PhysPtrTest, HandlesSize) {
+TEST(PhysPtrTest, HandlesUint32) {
   constexpr uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
-  constexpr size_t value = 0xbeef, write_value = 0xdeed;
+  constexpr uint32_t value = 0xdeadbeef, write_value = 0xbad0deed;
   constexpr uintptr_t zero_addr = 0;
   ASSERT_LE(256, phys_buffer_size);
   memset(phys_buffer, 0, 256);
-  *(reinterpret_cast<size_t*>(phys_buffer + addr)) = value;
+  *(reinterpret_cast<uint32_t*>(phys_buffer + addr)) = value;
 
-  phys_ptr<size_t> ptr_addr{addr};
+  phys_ptr<uint32_t> ptr_addr{addr};
   ASSERT_EQ(addr, uintptr_t{ptr_addr});
   ASSERT_EQ(value, *ptr_addr);
 
-  phys_ptr<size_t> ptr_copy_ctor{ptr_addr};
+  phys_ptr<uint32_t> ptr_copy_ctor{ptr_addr};
   ASSERT_EQ(addr, uintptr_t{ptr_copy_ctor});
   ASSERT_EQ(value, *ptr_copy_ctor);
 
-  phys_ptr<size_t> ptr_assign_copy{zero_addr};
+  phys_ptr<uint32_t> ptr_assign_copy{zero_addr};
   ptr_assign_copy = ptr_addr;
   ASSERT_EQ(addr, uintptr_t{ptr_assign_copy});
   ASSERT_EQ(value, *ptr_assign_copy);
 
-  phys_ptr<size_t> ptr_assign_move{zero_addr};
-  ptr_assign_move = phys_ptr<size_t>(addr);
+  phys_ptr<uint32_t> ptr_assign_move{zero_addr};
+  ptr_assign_move = phys_ptr<uint32_t>(addr);
   ASSERT_EQ(addr, uintptr_t{ptr_assign_move});
   ASSERT_EQ(value, *ptr_assign_move);
 
@@ -148,20 +149,20 @@ TEST(PhysPtrTest, HandlesSize) {
   ASSERT_EQ(write_value, *ptr_addr);
   *ptr_addr = value;
 
-  phys_ref<size_t> ref = *ptr_addr;
+  phys_ref<uint32_t> ref = *ptr_addr;
   ASSERT_EQ(&ref, ptr_addr);
 
-  *(reinterpret_cast<size_t*>(phys_buffer + addr) + 1) = write_value;
+  *(reinterpret_cast<uint32_t*>(phys_buffer + addr) + 1) = write_value;
   ASSERT_EQ(value, ptr_addr[0]);
   ASSERT_EQ(write_value, ptr_addr[1]);
-  *(reinterpret_cast<size_t*>(phys_buffer + addr) + 1) = 0;
+  *(reinterpret_cast<uint32_t*>(phys_buffer + addr) + 1) = 0;
   ptr_addr[2] = write_value;
   ASSERT_EQ(write_value,
-            *(reinterpret_cast<size_t*>(phys_buffer + addr) + 2));
+            *(reinterpret_cast<uint32_t*>(phys_buffer + addr) + 2));
   ptr_addr[2] = 0;
 
-  phys_ref<size_t> other_ref = ptr_addr[1];
-  *(reinterpret_cast<size_t*>(phys_buffer + addr) + 1) = write_value;
+  phys_ref<uint32_t> other_ref = ptr_addr[1];
+  *(reinterpret_cast<uint32_t*>(phys_buffer + addr) + 1) = write_value;
   *ptr_addr = ptr_addr[1];
   *ptr_addr = other_ref;
   ASSERT_EQ(write_value, ptr_addr[0]);
@@ -169,7 +170,7 @@ TEST(PhysPtrTest, HandlesSize) {
   *ptr_addr = value;
   ptr_addr[1] = 0;
 
-  *(reinterpret_cast<size_t*>(phys_buffer + addr) + 1) = write_value;
+  *(reinterpret_cast<uint32_t*>(phys_buffer + addr) + 1) = write_value;
   *ptr_addr = ptr_addr[1];
   ASSERT_EQ(write_value, ptr_addr[0]);
   ASSERT_EQ(write_value, ptr_addr[1]);
@@ -177,152 +178,156 @@ TEST(PhysPtrTest, HandlesSize) {
   ptr_addr[1] = 0;
 
   ASSERT_EQ(true, ptr_addr == ptr_copy_ctor);
-  ASSERT_EQ(false, ptr_addr == phys_ptr<size_t>{addr + 1});
+  ASSERT_EQ(false, ptr_addr == phys_ptr<uint32_t>{addr + 1});
 
   ASSERT_EQ(false, ptr_addr != ptr_copy_ctor);
-  ASSERT_EQ(true, ptr_addr != phys_ptr<size_t>{addr + 1});
+  ASSERT_EQ(true, ptr_addr != phys_ptr<uint32_t>{addr + 1});
 
   ASSERT_EQ(&ptr_addr[16], ptr_addr + 16);
 
-  phys_ptr<size_t> ptr_sum = ptr_addr;
+  phys_ptr<uint32_t> ptr_sum = ptr_addr;
   ptr_sum += 16;
   ASSERT_EQ(&ptr_addr[16], ptr_sum);
 
   ASSERT_EQ(&ptr_addr[8], ptr_sum - 8);
 
-  phys_ptr<size_t> ptr_diff = ptr_sum;
+  phys_ptr<uint32_t> ptr_diff = ptr_sum;
   ptr_diff -= 8;
   ASSERT_EQ(&ptr_addr[8], ptr_diff);
 
   *ptr_addr += write_value;
   ASSERT_EQ(value + write_value,
-            *(reinterpret_cast<size_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<uint32_t*>(phys_buffer + addr)));
   ASSERT_EQ(value + write_value, *ptr_addr);
   *ptr_addr = value;
 
   *ptr_addr -= write_value;
   ASSERT_EQ(value - write_value,
-            *(reinterpret_cast<size_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<uint32_t*>(phys_buffer + addr)));
   ASSERT_EQ(value - write_value, *ptr_addr);
   *ptr_addr = value;
 
   static_assert(value != (value | write_value), "Invalid test setup.");
   *ptr_addr |= write_value;
   ASSERT_EQ(value | write_value,
-            *(reinterpret_cast<size_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<uint32_t*>(phys_buffer + addr)));
   ASSERT_EQ(value | write_value, *ptr_addr);
   *ptr_addr = value;
 
   static_assert(value != (value & write_value), "Invalid test setup.");
   *ptr_addr &= write_value;
   ASSERT_EQ(value & write_value,
-            *(reinterpret_cast<size_t*>(phys_buffer + addr)));
+            *(reinterpret_cast<uint32_t*>(phys_buffer + addr)));
   ASSERT_EQ(value & write_value, *ptr_addr);
   *ptr_addr = value;
 
-  ASSERT_EQ(0, uintptr_t{phys_ptr<size_t*>::null()});
+  ASSERT_EQ(0, uintptr_t{phys_ptr<uint32_t*>::null()});
 
-  *(reinterpret_cast<size_t*>(phys_buffer + addr)) = 0;
+  *(reinterpret_cast<uint32_t*>(phys_buffer + addr)) = 0;
 }
 
-TEST(PhysPtrTest, HandlesPhysPtrOfSize) {
+TEST(PhysPtrTest, HandlesPhysPtrOfUint64) {
   constexpr uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
-  constexpr phys_ptr<size_t> value{0xbeef}, write_value{0xdeed};
+  constexpr phys_ptr<uint64_t> value{0xdeadbeefdeadbeef},
+      write_value{0xbad0deedbad0deed};
   constexpr uintptr_t zero_addr = 0;
   ASSERT_LE(256, phys_buffer_size);
   memset(phys_buffer, 0, 256);
-  *(reinterpret_cast<phys_ptr<size_t>*>(phys_buffer + addr)) = value;
+  *(reinterpret_cast<phys_ptr<uint64_t>*>(phys_buffer + addr)) = value;
 
-  phys_ptr<phys_ptr<size_t>> ptr_addr{addr};
+  phys_ptr<phys_ptr<uint64_t>> ptr_addr{addr};
   ASSERT_EQ(addr, uintptr_t{ptr_addr});
-  ASSERT_EQ(value, phys_ptr<size_t>(*ptr_addr));
+  ASSERT_EQ(value, phys_ptr<uint64_t>(*ptr_addr));
 
-  phys_ptr<phys_ptr<size_t>> ptr_copy_ctor{ptr_addr};
+  phys_ptr<phys_ptr<uint64_t>> ptr_copy_ctor{ptr_addr};
   ASSERT_EQ(addr, uintptr_t{ptr_copy_ctor});
-  ASSERT_EQ(value, phys_ptr<size_t>(*ptr_copy_ctor));
+  ASSERT_EQ(value, phys_ptr<uint64_t>(*ptr_copy_ctor));
 
-  phys_ptr<phys_ptr<size_t>> ptr_assign_copy{zero_addr};
+  phys_ptr<phys_ptr<uint64_t>> ptr_assign_copy{zero_addr};
   ptr_assign_copy = ptr_addr;
   ASSERT_EQ(addr, uintptr_t{ptr_assign_copy});
-  ASSERT_EQ(value, phys_ptr<size_t>(*ptr_assign_copy));
+  ASSERT_EQ(value, phys_ptr<uint64_t>(*ptr_assign_copy));
 
-  phys_ptr<phys_ptr<size_t>> ptr_assign_move{zero_addr};
-  ptr_assign_move = phys_ptr<phys_ptr<size_t>>(addr);
+  phys_ptr<phys_ptr<uint64_t>> ptr_assign_move{zero_addr};
+  ptr_assign_move = phys_ptr<phys_ptr<uint64_t>>(addr);
   ASSERT_EQ(addr, uintptr_t{ptr_assign_move});
-  ASSERT_EQ(value, phys_ptr<size_t>(*ptr_assign_move));
+  ASSERT_EQ(value, phys_ptr<uint64_t>(*ptr_assign_move));
 
   *ptr_addr = write_value;
   ASSERT_EQ(write_value, *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
-  ASSERT_EQ(write_value, phys_ptr<size_t>(*ptr_addr));
+  ASSERT_EQ(write_value, phys_ptr<uint64_t>(*ptr_addr));
   *ptr_addr = value;
 
-  phys_ref<phys_ptr<size_t>> ref = *ptr_addr;
+  phys_ref<phys_ptr<uint64_t>> ref = *ptr_addr;
   ASSERT_EQ(&ref, ptr_addr);
 
-  *(reinterpret_cast<phys_ptr<size_t>*>(phys_buffer + addr) + 1) = write_value;
-  ASSERT_EQ(value, phys_ptr<size_t>(ptr_addr[0]));
-  ASSERT_EQ(write_value, phys_ptr<size_t>(ptr_addr[1]));
-  *(reinterpret_cast<phys_ptr<size_t>*>(phys_buffer + addr) + 1) = 0;
+  *(reinterpret_cast<phys_ptr<uint64_t>*>(phys_buffer + addr) + 1) =
+      write_value;
+  ASSERT_EQ(value, phys_ptr<uint64_t>(ptr_addr[0]));
+  ASSERT_EQ(write_value, phys_ptr<uint64_t>(ptr_addr[1]));
+  *(reinterpret_cast<phys_ptr<uint64_t>*>(phys_buffer + addr) + 1) = 0;
   ptr_addr[2] = write_value;
   ASSERT_EQ(write_value,
-            *(reinterpret_cast<phys_ptr<size_t>*>(phys_buffer + addr) + 2));
+            *(reinterpret_cast<phys_ptr<uint64_t>*>(phys_buffer + addr) + 2));
   ptr_addr[2] = 0;
 
-  phys_ref<phys_ptr<size_t>> other_ref = ptr_addr[1];
-  *(reinterpret_cast<phys_ptr<size_t>*>(phys_buffer + addr) + 1) = write_value;
+  phys_ref<phys_ptr<uint64_t>> other_ref = ptr_addr[1];
+  *(reinterpret_cast<phys_ptr<uint64_t>*>(phys_buffer + addr) + 1) =
+      write_value;
   *ptr_addr = ptr_addr[1];
   *ptr_addr = other_ref;
-  ASSERT_EQ(write_value, phys_ptr<size_t>(ptr_addr[0]));
-  ASSERT_EQ(write_value, phys_ptr<size_t>(ptr_addr[1]));
+  ASSERT_EQ(write_value, phys_ptr<uint64_t>(ptr_addr[0]));
+  ASSERT_EQ(write_value, phys_ptr<uint64_t>(ptr_addr[1]));
   *ptr_addr = value;
   ptr_addr[1] = 0;
 
-  *(reinterpret_cast<phys_ptr<size_t>*>(phys_buffer + addr) + 1) = write_value;
+  *(reinterpret_cast<phys_ptr<uint64_t>*>(phys_buffer + addr) + 1) =
+      write_value;
   *ptr_addr = ptr_addr[1];
-  ASSERT_EQ(write_value, phys_ptr<size_t>(ptr_addr[0]));
-  ASSERT_EQ(write_value, phys_ptr<size_t>(ptr_addr[1]));
+  ASSERT_EQ(write_value, phys_ptr<uint64_t>(ptr_addr[0]));
+  ASSERT_EQ(write_value, phys_ptr<uint64_t>(ptr_addr[1]));
   *ptr_addr = value;
   ptr_addr[1] = 0;
 
   ASSERT_EQ(true, ptr_addr == ptr_copy_ctor);
-  ASSERT_EQ(false, ptr_addr == phys_ptr<phys_ptr<size_t>>{addr + 1});
+  ASSERT_EQ(false, ptr_addr == phys_ptr<phys_ptr<uint64_t>>{addr + 1});
 
   ASSERT_EQ(false, ptr_addr != ptr_copy_ctor);
-  ASSERT_EQ(true, ptr_addr != phys_ptr<phys_ptr<size_t>>{addr + 1});
+  ASSERT_EQ(true, ptr_addr != phys_ptr<phys_ptr<uint64_t>>{addr + 1});
 
   ASSERT_EQ(&ptr_addr[16], ptr_addr + 16);
 
-  phys_ptr<phys_ptr<size_t>> ptr_sum = ptr_addr;
+  phys_ptr<phys_ptr<uint64_t>> ptr_sum = ptr_addr;
   ptr_sum += 16;
   ASSERT_EQ(&ptr_addr[16], ptr_sum);
 
   ASSERT_EQ(&ptr_addr[8], ptr_sum - 8);
 
-  phys_ptr<phys_ptr<size_t>> ptr_diff = ptr_sum;
+  phys_ptr<phys_ptr<uint64_t>> ptr_diff = ptr_sum;
   ptr_diff -= 8;
   ASSERT_EQ(&ptr_addr[8], ptr_diff);
 
-  size_t offset = 0xfade;
+  uint64_t offset = 0xfade;
   *ptr_addr += offset;
   ASSERT_EQ(value + offset,
             *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
-  ASSERT_EQ(value + offset, phys_ptr<size_t>(*ptr_addr));
+  ASSERT_EQ(value + offset, phys_ptr<uint64_t>(*ptr_addr));
   *ptr_addr = value;
 
   *ptr_addr -= offset;
   ASSERT_EQ(value - offset,
             *(reinterpret_cast<uintptr_t*>(phys_buffer + addr)));
-  ASSERT_EQ(value - offset, phys_ptr<size_t>(*ptr_addr));
+  ASSERT_EQ(value - offset, phys_ptr<uint64_t>(*ptr_addr));
   *ptr_addr = value;
 
-  ASSERT_EQ(0, uintptr_t{phys_ptr<phys_ptr<size_t>*>::null()});
+  ASSERT_EQ(0, uintptr_t{phys_ptr<phys_ptr<uint64_t>*>::null()});
 
-  *(reinterpret_cast<phys_ptr<size_t>*>(phys_buffer + addr)) = 0;
+  *(reinterpret_cast<phys_ptr<uint64_t>*>(phys_buffer + addr)) = 0;
 }
 
 TEST(PhysPtrTest, HandlesPhysPtrOfUint32) {
   constexpr uintptr_t addr = 160;  // Aligned by 32, should satisfy most archs.
-  constexpr phys_ptr<uint32_t> value{0xbeef}, write_value{0xdeed};
+  constexpr phys_ptr<uint32_t> value{0xdeadbeef}, write_value{0xbad0deed};
   constexpr uintptr_t zero_addr = 0;
   ASSERT_LE(256, phys_buffer_size);
   memset(phys_buffer, 0, 256);
@@ -354,7 +359,8 @@ TEST(PhysPtrTest, HandlesPhysPtrOfUint32) {
   phys_ref<phys_ptr<uint32_t>> ref = *ptr_addr;
   ASSERT_EQ(&ref, ptr_addr);
 
-  *(reinterpret_cast<phys_ptr<uint32_t>*>(phys_buffer + addr) + 1) = write_value;
+  *(reinterpret_cast<phys_ptr<uint32_t>*>(phys_buffer + addr) + 1) =
+      write_value;
   ASSERT_EQ(value, phys_ptr<uint32_t>(ptr_addr[0]));
   ASSERT_EQ(write_value, phys_ptr<uint32_t>(ptr_addr[1]));
   *(reinterpret_cast<phys_ptr<uint32_t>*>(phys_buffer + addr) + 1) = 0;
@@ -364,7 +370,8 @@ TEST(PhysPtrTest, HandlesPhysPtrOfUint32) {
   ptr_addr[2] = 0;
 
   phys_ref<phys_ptr<uint32_t>> other_ref = ptr_addr[1];
-  *(reinterpret_cast<phys_ptr<uint32_t>*>(phys_buffer + addr) + 1) = write_value;
+  *(reinterpret_cast<phys_ptr<uint32_t>*>(phys_buffer + addr) + 1) =
+      write_value;
   *ptr_addr = ptr_addr[1];
   *ptr_addr = other_ref;
   ASSERT_EQ(write_value, phys_ptr<uint32_t>(ptr_addr[0]));
@@ -372,7 +379,8 @@ TEST(PhysPtrTest, HandlesPhysPtrOfUint32) {
   *ptr_addr = value;
   ptr_addr[1] = 0;
 
-  *(reinterpret_cast<phys_ptr<uint32_t>*>(phys_buffer + addr) + 1) = write_value;
+  *(reinterpret_cast<phys_ptr<uint32_t>*>(phys_buffer + addr) + 1) =
+      write_value;
   *ptr_addr = ptr_addr[1];
   ASSERT_EQ(write_value, phys_ptr<uint32_t>(ptr_addr[0]));
   ASSERT_EQ(write_value, phys_ptr<uint32_t>(ptr_addr[1]));

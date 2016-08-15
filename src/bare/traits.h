@@ -19,7 +19,7 @@ template<typename T> struct remove_cv {
   typedef typename remove_volatile<typename remove_const<T>::type>::type type;
 };
 
-// integral_constant  (used below)
+// integral_constant (used below)
 template<typename T, T v> struct integral_constant {
     static constexpr const T value = v;
     typedef T value_type;

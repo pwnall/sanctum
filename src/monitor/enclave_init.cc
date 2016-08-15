@@ -48,7 +48,7 @@ using sanctum::internal::read_enclave_region_bitmap_bit;
 using sanctum::internal::test_and_set_dram_region_lock;
 using sanctum::internal::thread_metadata_pages;
 using sanctum::internal::thread_metadata_size;
-using sanctum::internal::thread_metadata_t;
+using sanctum::internal::thread_info_t;
 using sanctum::internal::walk_page_tables;
 using sanctum::internal::walk_page_tables_to_entry;
 
@@ -57,7 +57,7 @@ namespace api {  // sanctum::api
 namespace os {  // sancum::api::os
 
 
-api_result_t load_enclave_page_table(enclave_id_t enclave_id,
+api_result_t load_page_table(enclave_id_t enclave_id,
     uintptr_t phys_addr, uintptr_t virtual_addr, size_t level, size_t acl) {
   if (!is_dram_address(phys_addr))
     return monitor_invalid_value;
@@ -146,7 +146,7 @@ api_result_t load_enclave_page_table(enclave_id_t enclave_id,
   return monitor_ok;
 }
 
-api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
+api_result_t load_page(enclave_id_t enclave_id, uintptr_t phys_addr,
     uintptr_t virtual_addr, uintptr_t os_addr, uintptr_t acl) {
   if (!is_dram_address(phys_addr) || !is_dram_address(os_addr))
     return monitor_invalid_value;
@@ -183,7 +183,7 @@ api_result_t load_enclave_page(enclave_id_t enclave_id, uintptr_t phys_addr,
     return monitor_invalid_value;
   }
 
-  // NOTE: See load_enclave_page_table for the explanation why we don't need to
+  // NOTE: See load_page_table for the explanation why we don't need to
   //       lock phys_addr's DRAM region.
   size_t page_dram_region = dram_region_for(phys_addr);
   if (!read_bitmap_bit(enclave_region_bitmap(enclave_id), page_dram_region)) {

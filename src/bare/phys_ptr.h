@@ -38,8 +38,8 @@ public:
   //   phys_ref<size_t> ref = *b;
   //   *a = ref;
   //
-  // Implementing this lets use phys_ref explicitly, in case we ever decide to
-  // e.g., use it to express non-null pointers, like WebKit does.
+  // Implementing this lets us use phys_ref explicitly, in case we ever decide
+  // to e.g., use it to express non-null pointers, like WebKit does.
   phys_ref<T>& operator =(const phys_ref<T>& other) {
     const T value = other.operator T();
     return this->operator =(value);
@@ -47,7 +47,7 @@ public:
   // Move-assignment.
   //
   // This is used for de-referencing phys_ptr assignment (*a = *b).
-  inline phys_ref<T>& operator =(phys_ref<T>&& other) {
+  inline phys_ref<T>& operator =(const phys_ref<T>&& other) {
     // NOTE: we write this in terms of standard de-referencing and assignment
     //       so we don't have to write assembly for those twice; it would only
     //       make sense to implement this directly if the underlying

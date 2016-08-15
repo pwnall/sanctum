@@ -45,7 +45,7 @@ using sanctum::internal::read_dram_region_owner;
 using sanctum::internal::reserve_metadata_pages;
 using sanctum::internal::test_and_set_dram_region_lock;
 using sanctum::internal::thread_metadata_page_type;
-using sanctum::internal::thread_metadata_t;
+using sanctum::internal::thread_info_t;
 using sanctum::internal::unlock_enclave;
 
 namespace sanctum {
@@ -133,7 +133,7 @@ api_result_t assign_thread(enclave_id_t enclave_id, thread_id_t thread_id) {
   return monitor_ok;
 }
 
-api_result_t load_enclave_thread(enclave_id_t enclave_id,
+api_result_t load_thread(enclave_id_t enclave_id,
     thread_id_t thread_id, uintptr_t entry_pc, uintptr_t entry_stack,
     uintptr_t fault_pc, uintptr_t fault_stack) {
   api_result_t result = lock_enclave(enclave_id);
@@ -164,13 +164,13 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
 
   enclave_info->*(&enclave_info_t::thread_count) += 1;
 
-  phys_ptr<thread_metadata_t> thread_metadata{thread_id};
-  atomic_flag_clear(&(thread_metadata->*(&thread_metadata_t::lock)));
-  thread_metadata->*(&thread_metadata_t::entry_pc) = entry_pc;
-  thread_metadata->*(&thread_metadata_t::entry_stack) = entry_stack;
-  thread_metadata->*(&thread_metadata_t::fault_pc) = fault_pc;
-  thread_metadata->*(&thread_metadata_t::fault_stack) = fault_stack;
-  thread_metadata->*(&thread_metadata_t::eptbr) =
+  phys_ptr<thread_info_t> thread_metadata{thread_id};
+  atomic_flag_clear(&(thread_metadata->*(&thread_info_t::lock)));
+  thread_metadata->*(&thread_info_t::entry_pc) = entry_pc;
+  thread_metadata->*(&thread_info_t::entry_stack) = entry_stack;
+  thread_metadata->*(&thread_info_t::fault_pc) = fault_pc;
+  thread_metadata->*(&thread_info_t::fault_stack) = fault_stack;
+  thread_metadata->*(&thread_info_t::eptbr) =
       enclave_info->*(&enclave_info_t::load_eptbr);
 
   extend_enclave_hash_with_thread(enclave_info, entry_pc, entry_stack,
@@ -185,11 +185,10 @@ api_result_t load_enclave_thread(enclave_id_t enclave_id,
 
 namespace enclave {  // namespace sanctum::api::enclave
 
-static_assert(sizeof(thread_info_t) <= page_size(),
-    "accept_enclave_thread assumes that thread_info_t fits into one page");
+static_assert(sizeof(thread_init_info_t) <= page_size(),
+    "accept_thread assumes that thread_init_info_t fits into one page");
 
-api_result_t accept_enclave_thread(thread_id_t thread_id,
-    uintptr_t thread_info_addr) {
+api_result_t accept_thread(thread_id_t thread_id, uintptr_t thread_info_addr) {
   if (!is_dram_address(thread_info_addr) || !is_page_aligned(thread_info_addr))
     return monitor_invalid_value;
 
@@ -224,26 +223,26 @@ api_result_t accept_enclave_thread(thread_id_t thread_id,
   // NOTE: The enclave's thread_count is NOT incremented here, because this
   //       thread was already accounted for in assign_thread().
 
-  phys_ptr<thread_metadata_t> thread_metadata{thread_id};
-  phys_ptr<thread_info_t> thread_info{thread_info_addr};
+  phys_ptr<thread_info_t> thread_metadata{thread_id};
+  phys_ptr<thread_init_info_t> thread_info{thread_info_addr};
 
-  atomic_flag_clear(&(thread_metadata->*(&thread_metadata_t::lock)));
+  atomic_flag_clear(&(thread_metadata->*(&thread_info_t::lock)));
 
   uintptr_t entry_pc = *phys_ptr<uintptr_t>{
-      uintptr_t{&(thread_info->*(&thread_info_t::entry_pc))}};
+      uintptr_t{&(thread_info->*(&thread_init_info_t::entry_pc))}};
   uintptr_t entry_stack = *phys_ptr<uintptr_t>{
-      uintptr_t{&(thread_info->*(&thread_info_t::entry_stack))}};
+      uintptr_t{&(thread_info->*(&thread_init_info_t::entry_stack))}};
   uintptr_t fault_pc = *phys_ptr<uintptr_t>{
-      uintptr_t{&(thread_info->*(&thread_info_t::fault_pc))}};
+      uintptr_t{&(thread_info->*(&thread_init_info_t::fault_pc))}};
   uintptr_t fault_stack = *phys_ptr<uintptr_t>{
-      uintptr_t{&(thread_info->*(&thread_info_t::fault_stack))}};
-  uintptr_t eptbr = thread_info->*(&thread_info_t::eptbr);
+      uintptr_t{&(thread_info->*(&thread_init_info_t::fault_stack))}};
+  uintptr_t eptbr = thread_info->*(&thread_init_info_t::eptbr);
 
-  thread_metadata->*(&thread_metadata_t::entry_pc) = entry_pc;
-  thread_metadata->*(&thread_metadata_t::entry_stack) = entry_stack;
-  thread_metadata->*(&thread_metadata_t::fault_pc) = fault_pc;
-  thread_metadata->*(&thread_metadata_t::fault_stack) = fault_stack;
-  thread_metadata->*(&thread_metadata_t::eptbr) = eptbr;
+  thread_metadata->*(&thread_info_t::entry_pc) = entry_pc;
+  thread_metadata->*(&thread_info_t::entry_stack) = entry_stack;
+  thread_metadata->*(&thread_info_t::fault_pc) = fault_pc;
+  thread_metadata->*(&thread_info_t::fault_stack) = fault_stack;
+  thread_metadata->*(&thread_info_t::eptbr) = eptbr;
 
   clear_dram_region_lock(enclave_dram_region);
   clear_dram_region_lock(thread_dram_region);

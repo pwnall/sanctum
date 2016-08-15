@@ -6,6 +6,8 @@
 namespace sanctum {
 namespace internal {
 
+using sanctum::bare::uintptr_t;
+
 // The top of the memory used by the security monitor.
 //
 // This is used to track memory allocation during boot. It remains constant
