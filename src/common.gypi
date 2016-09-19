@@ -2,7 +2,7 @@
   'variables': {
     'clang': 'build/llvm-build/bin',
     'library': 'static_library',
-    'mac_sdk': '10.11',
+    'mac_sdk': '10.12',
     'mac_deployment_target': '10.7',
   },
 

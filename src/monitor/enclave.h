@@ -51,31 +51,12 @@ struct thread_info_t {
   size_t can_resume;            // true if the AEX state is valid
 };
 
-// Secure inter-enclave communication.
-struct mailbox_t {
-  atomic_flag lock;
-  size_t state;
-
-  // The OS-assigned enclave ID of the expected sender.
-  //
-  // This is necessary to prevent a malicious enclave from DoSing other
-  // enclaves in the system by spamming their mailboxes. This enclave ID should
-  // not be trusted to identify the software inside the sender.
-  enclave_id_t sender_id;
-  // The measurement of the expected sender.
-  //
-  // This is a secure identifier for the software inside the sender enclave.
-  hash_state_t sender_hash;
-};
-
 // Per-enclave accounting information.
 //
 // This structure is stored at the beginning of an enclave's main DRAM region,
-// followed by the enclave's DRAM region bitmap and thread slots. The monitor
+// followed by the enclave's DRAM region bitmap and mailboxes. The monitor
 // ensures that the pages holding the structure are not evicted while the
 // enclave is alive.
-//
-// This is synchronized by the lock of the enclave's main DRAM region.
 struct enclave_info_t {
   // Protects this structure from data races.
   //

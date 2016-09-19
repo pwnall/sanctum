@@ -88,7 +88,12 @@ size_t dram_size();
 // calls are provided for dram_region_{count,shift}().
 size_t dram_region_mask();
 
-// Locks a DRAM region that was previously owned by the caller.
+// Blocks a DRAM region that was previously owned by the caller.
+//
+// After this call completes, the caller should not expect to be able to access
+// the memory inside the blocked DRAM region. The memory might still be
+// accessible via stale TLB entries, but these entries will be removed before
+// the DRAM region is freed.
 //
 // Enclaves calling this API are responsible for wiping any confidential
 // information from the relinquished DRAM region.
@@ -106,17 +111,18 @@ namespace enclave {  // sanctum::api::enclave
 // if it sees any return value other than monitor_ok.
 api_result_t dram_region_check_ownership(size_t dram_region);
 
-// Allocates a thread info slot.
+// Creates a hardware thread using metadata pages assigned by the OS.
 //
-// `phys_addr` is the physical address of a range of pages that will hold the
-// thread_init_info_t structure. The address must be page-aligned, and must not
-// overlap with the pages used by the monitor.
+// `thread_id` is a thread ID used by the OS in an `assign_thread` call that
+// assigned metadata pages to this enclave. Enclaves can safely pass any value
+// supplied by the OS as a parameter to this call, but must be prepared to
+// handle an error code, which may occur if the OS supplies an incorrect value.
+//
+// `thread_info_addr` is the physical address of a thread_init_info_t structure
+// that will be used to initialize the thread's metadata. The address must be
+// page-aligned. The memory used for the thread_init_info_t structure can be
+// reused for other purposes once the API call returns.
 api_result_t accept_thread(thread_id_t thread_id, uintptr_t thread_info_addr);
-
-// Deallocates a thread info slot.
-//
-// The thread must not be running on any core.
-api_result_t delete_thread(thread_id_t thread_id);
 
 // Ends the currently running enclave thread and returns control to the OS.
 api_result_t exit_enclave();
@@ -179,7 +185,15 @@ typedef struct {
   uintptr_t eptbr;
 } thread_init_info_t;
 
-//
+// The size of enclave's measurement, in bytes.
+constexpr size_t measurement_size = 64;
+static_assert(measurement_size % sizeof(uintptr_t) == 0,
+    "The enclave measurement size must be a multiple of the uintptr_t size");
+
+// The size of a message carried by a mailbox, in bytes.
+constexpr size_t mailbox_message_size = 128;
+
+// Identifies the sender or receiver of a mailbox message.
 typedef struct {
   // The enclave ID is supplied by the OS.
   //
@@ -191,8 +205,14 @@ typedef struct {
   //
   // This ensures that the identity of the enclave on the other side is as
   // expected.
-  uint8_t enclave_hash[64];
+  uintptr_t enclave_hash[measurement_size / sizeof(uintptr_t)];
 } mailbox_identity_t;
+
+// Information used to send or receive a mailbox message.
+typedef struct {
+  uintptr_t message[mailbox_message_size / sizeof(uintptr_t)];
+  mailbox_identity_t other_side;
+} mailbox_message_t;
 
 };  // namespace sanctum::api::enclave
 
@@ -344,17 +364,13 @@ api_result_t load_thread(enclave_id_t enclave_id, thread_id_t thread_id,
 
 // Allocates a thread metadata structure to be used by an enclave.
 //
-// `thread_id` must be the physical address of the first page in a sequence of
-// free pages in the same DRAM metadata region. It becomes the enclave's ID
-// used for subsequent API calls. The required number of free metadata pages
-// can be obtained by calling `enclave_metadata_pages`.
-//
 // `enclave_id` must be an enclave that has been initialized and has not yet
 // been killed.
 //
-// `phys_addr` is the physical address of a range of pages that will hold the
-// thread_init_info_t structure. The address must be page-aligned, and must not
-// overlap with the pages used by the monitor.
+// `thread_id` must be the physical address of the first page in a sequence of
+// free pages in the same DRAM metadata region. It becomes the thread's ID used
+// for subsequent API calls. The required number of free metadata pages can be
+// obtained by calling `thread_metadata_pages`.
 api_result_t assign_thread(enclave_id_t enclave_id, thread_id_t thread_id);
 
 // Marks the given enclave as initialized and ready to execute.
@@ -373,6 +389,11 @@ api_result_t init_enclave(enclave_id_t enclave_id);
 // `thread_id` must identify a hardware thread that was created but is not
 // executing on any core.
 api_result_t enter_enclave(enclave_id_t enclave_id, thread_id_t thread_id);
+
+// Deallocates a thread info slot.
+//
+// The thread must not be running on any core.
+api_result_t delete_thread(thread_id_t thread_id);
 
 // Frees up all DRAM regions and the metadata associated with an enclave.
 //

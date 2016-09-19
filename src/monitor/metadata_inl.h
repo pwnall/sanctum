@@ -7,6 +7,7 @@
 #include "bare/phys_ptr.h"
 #include "dram_regions_inl.h"
 #include "enclave.h"
+#include "mailbox.h"
 #include "metadata.h"
 
 namespace sanctum {
