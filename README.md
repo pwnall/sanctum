@@ -1,9 +1,10 @@
 # Sanctum
 
+**This repository is deprecated. Please use https://github.com/ilebedev/sanctum.**
+
 Research prototype for a SGX clone that protects against all software attacks,
 including timing attacks, and requires minimal architectural extensions to a
 RISC V processor.
-
 
 ## Building the Code
 
